@@ -1,0 +1,22 @@
+{
+  "name": "matt_bday",
+  "version": "1.0.0",
+  "description": "Web game for a funny birthday treat. the game is in the style of a classical endless runner.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babylonjs/core": "^9.18.0",
+    "@babylonjs/havok": "^1.3.13"
+  },
+  "devDependencies": {
+    "@modyfi/vite-plugin-yaml": "^1.1.1",
+    "vite": "^8.1.5"
+  }
+}

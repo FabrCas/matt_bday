@@ -1,0 +1,31 @@
+# =============================================================
+#  Configurazione statica del gioco
+#  Modifica questi valori per calibrare titolo, economia e
+#  gameplay SENZA toccare il codice. Viene letto in fase di build.
+# =============================================================
+
+# --- Testi / branding ---
+game:
+  title: "Birthday Runner"
+  subtitle: "Raccogli più monete che puoi!"
+
+# --- Economia / vincita ---
+economy:
+  currencySymbol: "€"
+  coinValue: 0.5          # valore in valuta di ogni moneta raccolta
+  # Vincita massima raggiungibile (0 = nessun tetto).
+  maxPayout: 0
+
+# --- Parametri di gameplay (endless runner a corsie) ---
+gameplay:
+  lanes: [-2.2, 0, 2.2]   # posizioni x delle 3 corsie
+  startSpeed: 14          # velocità iniziale (unità/s)
+  maxSpeed: 30            # velocità massima
+  acceleration: 0.35      # incremento velocità nel tempo
+  laneChangeSpeed: 12     # rapidità di cambio corsia
+  jumpSpeed: 9            # spinta del salto
+  gravity: -22            # gravità applicata in aria
+  spawnAhead: 70          # distanza a cui vengono generati gli oggetti
+  rowGap: 9               # distanza tra righe di ostacoli/monete
+  coinRowLength: 3        # numero di monete per fila
+  coinSpawnChance: 0.8    # probabilità (0..1) di spawnare monete in una riga

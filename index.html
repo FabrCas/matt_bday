@@ -2,27 +2,45 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
-
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #0f172a;
-            color: white;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-
-        h1 {
-            font-size: 4rem;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <title>Birthday Runner</title>
+    <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
-    <h1>Hello World!</h1>
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <!-- ===== Overlay UI (HTML/CSS, mobile-first) ===== -->
+
+    <!-- Loading -->
+    <div id="loading" class="overlay">
+        <div class="spinner"></div>
+        <p>Caricamento…</p>
+    </div>
+
+    <!-- Menu -->
+    <div id="menu" class="overlay hidden">
+        <h1 class="title" id="menu-title">Placeholder</h1>
+        <p class="subtitle" id="menu-subtitle">Placeholder</p>
+        <button id="btn-play" class="btn">GIOCA</button>
+    </div>
+
+    <!-- HUD in-game -->
+    <div id="hud" class="hud hidden">
+        <div class="hud-item">🪙 <span id="hud-coins">0</span></div>
+        <div class="hud-item">📏 <span id="hud-distance">0</span> m</div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameover" class="overlay hidden">
+        <h2 class="title">Game Over</h2>
+        <p class="won-label">Hai vinto</p>
+        <p class="won-amount" id="won-amount">€ 0</p>
+        <p class="run-stats"><span id="go-coins">0</span> monete · <span id="go-distance">0</span> m</p>
+        <button id="btn-retry" class="btn">RIGIOCA</button>
+        <button id="btn-menu" class="btn btn-ghost">MENU</button>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>
