@@ -1,6 +1,8 @@
 # matt_bday
 
-Web game for a funny birthday treat — un endless runner 3D in stile classico (a corsie).
+Web game for a funny birthday treat — un endless runner 3D in stile classico (a corsie).  
+
+[URL to the game](https://fabrcas.github.io/matt_bday/)
 
 Costruito con **Babylon.js** + **Havok** (fisica), **JavaScript (ES modules)** e bundlato con **Vite**. È interamente client-side (nessun backend) e ospitato staticamente su GitHub Pages.
 
