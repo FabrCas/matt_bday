@@ -2,4 +2,3 @@ node_modules/
 dist/
 .qodo/
 .claude
-claude.md
