@@ -12,6 +12,13 @@ export function isMobile() {
 // per mantenere leggibilità su schermi piccoli.
 export function getCameraProfile() {
   if (isMobile()) {
+    return { fov: 0.95, distance: 11, height: 5.5 };
+  }
+  return { fov: 0.8, distance: 11, height: 4.5 };
+}
+
+export function getCameraProfile_menu() {
+  if (isMobile()) {
     return { fov: 0.95, distance: 9, height: 5.5 };
   }
   return { fov: 0.8, distance: 11, height: 6 };

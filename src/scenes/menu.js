@@ -9,14 +9,14 @@ import {
   Vector3,
 } from "@babylonjs/core";
 import * as ui from "../ui/ui.js";
-import { getCameraProfile } from "../utils/responsive.js";
+import { getCameraProfile_menu } from "../utils/responsive.js";
 
 // Scena Menu: sfondo 3D leggero (una forma che ruota) + overlay HTML per i testi.
 export function createMenuScene({ engine, goto }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.06, 0.09, 0.16, 1);
 
-  const cam = getCameraProfile();
+  const cam = getCameraProfile_menu();
   const camera = new FreeCamera("menuCam", new Vector3(0, cam.height, -cam.distance), scene);
   camera.setTarget(new Vector3(0, 1, 0));
   camera.fov = cam.fov;

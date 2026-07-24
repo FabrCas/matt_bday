@@ -9,7 +9,7 @@ import {
   Vector3,
 } from "@babylonjs/core";
 import * as ui from "../ui/ui.js";
-import { getCameraProfile } from "../utils/responsive.js";
+import { getCameraProfile_menu } from "../utils/responsive.js";
 
 // Scena Game Over: mostra la vincita (overlay HTML) su sfondo 3D sobrio.
 export function createGameOverScene({ engine, payload = {} }) {
@@ -18,7 +18,7 @@ export function createGameOverScene({ engine, payload = {} }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.06, 0.09, 0.16, 1);
 
-  const cam = getCameraProfile();
+  const cam = getCameraProfile_menu();
   const camera = new FreeCamera("goCam", new Vector3(0, cam.height, -cam.distance), scene);
   camera.setTarget(new Vector3(0, 1, 0));
   camera.fov = cam.fov;
