@@ -14,8 +14,8 @@ import { getCameraProfile } from "../utils/responsive.js";
 import { CONFIG, computePayout } from "../config/index.js";
 import { loadModel, disposeModel } from "../utils/modelLoader.js";
 
-// Modello del player: static/assets/3d-models/character.glb
-const PLAYER_MODEL = "character.glb";
+// Modello del player: static/assets/3d-models/test.glb
+const PLAYER_MODEL = "test.glb";
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;

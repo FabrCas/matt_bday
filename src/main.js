@@ -32,7 +32,16 @@ async function goto(name, payload) {
   if (!factory) throw new Error(`Scena sconosciuta: ${name}`);
 
   ui.show("loading");
-  const next = await factory({ engine, canvas, goto, payload });
+  let next;
+  try {
+    next = await factory({ engine, canvas, goto, payload });
+  } catch (err) {
+    // Es. asset mancante/non caricabile: non restare bloccati su "loading",
+    // torna al menu (a meno che il fallimento non sia già nel menu stesso).
+    console.error(`Impossibile caricare la scena "${name}":`, err);
+    if (name !== "menu") return goto("menu");
+    throw err;
+  }
 
   const previous = active;
   active = next;
