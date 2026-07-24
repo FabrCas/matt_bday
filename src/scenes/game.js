@@ -134,8 +134,13 @@ export async function createGameScene({ engine, canvas, goto }) {
     c.rotation.z = Math.PI / 2;
     c.setEnabled(false);
     if (DEBUG) c.showBoundingBox = true;
+    scene.onBeforeRenderObservable.add(() => {
+        c.rotation.y += 0.1;
+    });
     return { mesh: c, active: false, lane: 0, type: "coin" };
   }
+
+
   const obstacles = Array.from({ length: 12 }, (_, i) => makeObstacle(i));
   const coins = Array.from({ length: 24 }, (_, i) => makeCoin(i));
 
