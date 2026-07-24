@@ -63,3 +63,97 @@ function spawnObstacle(position) {
   container) nella `dispose()` della scena, per evitare leak di geometrie/texture tra un
   cambio scena e l'altro (vedi il pattern `factory(...) -> { scene, update, dispose }` in
   `main.js`).
+
+## textureLoader.js — import di immagini (.png / .jpg / .webp)
+
+Wrapper su `Texture` di Babylon.js, più un helper per caricare immagini come `<img>` HTML
+(per gli overlay UI, che sono DOM e non passano dal renderer 3D).
+
+### Setup
+
+Nessuna dipendenza aggiuntiva: `Texture` fa già parte di `@babylonjs/core`.
+Mettere i file in `static/assets/imgs/`; a runtime sono serviti come `./assets/imgs/<file>`.
+
+### Uso base
+
+```javascript
+import { loadTexture, applyTexture, disposeTexture } from "../utils/textureLoader.js";
+
+// come Texture standalone
+const tex = loadTexture(scene, "ground.webp");
+groundMat.diffuseTexture = tex;
+
+// oppure in una riga, direttamente su un materiale esistente
+applyTexture(coinMat, scene, "coin-diffuse.png"); // di default su diffuseTexture
+applyTexture(coinMat, scene, "coin-emissive.png", "emissiveTexture");
+
+// cleanup nella dispose() della scena
+disposeTexture(tex);
+```
+
+Per un logo/immagine negli overlay HTML (`menu`, `gameover`, ecc. in `index.html`):
+
+```javascript
+import { loadHtmlImage } from "../utils/textureLoader.js";
+
+const logo = await loadHtmlImage("logo.png");
+document.getElementById("menu").prepend(logo);
+```
+
+### Note
+
+- **Formato consigliato:** `.webp` per texture di scena (dimensione minore a parità di
+  qualità); `.png` per immagini con trasparenza usate negli overlay HTML.
+- **Dimensioni:** tenere le texture piccole (potenze di 2 quando possibile, es. 512x512)
+  per restare leggeri su hosting statico e su mobile, come indicato in `CLAUDE.md`.
+
+## audioLoader.js — import di suoni (.mp3 / .ogg)
+
+Wrapper su `Sound` di Babylon.js (audio legato alla scena 3D, incluso audio posizionale),
+più un helper basato su `HTMLAudioElement` nativo per SFX di UI che devono poter suonare
+anche fuori da una scena Babylon attiva (es. click nel menu).
+
+### Setup
+
+Nessuna dipendenza aggiuntiva: `Sound` fa già parte di `@babylonjs/core`.
+Mettere i file in `static/assets/sounds/`; a runtime sono serviti come `./assets/sounds/<file>`.
+
+> Nota: come tutti i browser, l'audio non parte finché l'utente non ha compiuto
+> un'interazione (click/tap) sulla pagina — avviare la riproduzione da un handler di click
+> (es. il pulsante "GIOCA") copre già questo caso.
+
+### Uso base
+
+```javascript
+import { loadSound, disposeSound } from "../utils/audioLoader.js";
+
+// dentro createGameScene({ engine, canvas, goto }) o simile
+const music = await loadSound(scene, "bgm.mp3", { loop: true, volume: 0.4 });
+music.play();
+
+const coinSfx = await loadSound(scene, "coin.mp3", { volume: 0.8 });
+// ad ogni raccolta moneta:
+coinSfx.play();
+
+// cleanup nella dispose() della scena
+disposeSound(music);
+disposeSound(coinSfx);
+```
+
+Per un SFX di UI (fuori dal ciclo di vita di una scena 3D):
+
+```javascript
+import { loadHtmlAudio, playHtmlAudio } from "../utils/audioLoader.js";
+
+const clickSfx = loadHtmlAudio("click.mp3", { volume: 0.6 });
+document.getElementById("btn-play").addEventListener("click", () => playHtmlAudio(clickSfx));
+```
+
+### Note
+
+- **Formato consigliato:** `.mp3` per compatibilità più ampia; `.ogg` come alternativa più
+  leggera dove supportata.
+- **Performance / hosting (GitHub Pages):** come da `CLAUDE.md`, tenere i file audio brevi e
+  compressi (bitrate contenuto) per non appesantire il caricamento iniziale.
+- **Cleanup:** chiamare `disposeSound(...)` nella `dispose()` della scena per i suoni creati
+  con `loadSound`, così da non accumulare buffer audio tra un cambio scena e l'altro.
