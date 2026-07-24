@@ -7,7 +7,7 @@
 # --- Debug ---
 # Se true, mostra a schermo l'hitbox (bounding box) di tutti gli oggetti
 # di gioco (player, ostacoli, monete), utile per calibrare le collisioni.
-debug: false
+debug: true
 
 # --- Testi / branding ---
 game:
@@ -19,7 +19,7 @@ economy:
   currencySymbol: "€"
   coinValue: 0.5          # valore in valuta di ogni moneta raccolta
   # Vincita massima raggiungibile (0 = nessun tetto).
-  maxPayout: 0
+  maxPayout: 10  # quota regalo
 
 # --- Parametri di gameplay (endless runner a corsie) ---
 gameplay:

@@ -63,7 +63,12 @@ export function formatMoney(amount) {
 
 // Calcola la vincita a partire dalle monete, applicando l'eventuale tetto.
 export function computePayout(coins) {
+  /*
+    ritorna array[int, bool] con primo elemento  valore di monete guadagnato come 
+    minimo tra vincita effettiva e massimo dispobile e secondo elemento un assegnazione 
+    booleana che indica se il player ha guadagnato piu' del massimo 
+  */
   const raw = coins * CONFIG.economy.coinValue;
   const cap = CONFIG.economy.maxPayout;
-  return cap > 0 ? Math.min(raw, cap) : raw;
+  return [cap > 0 ? Math.min(raw, cap) : raw, raw > cap ? true : false]
 }

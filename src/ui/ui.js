@@ -13,6 +13,7 @@ const els = {
   hudCoins: document.getElementById("hud-coins"),
   hudDistance: document.getElementById("hud-distance"),
   wonAmount: document.getElementById("won-amount"),
+  endMessage: document.getElementById("endgame-message"),
   goCoins: document.getElementById("go-coins"),
   goDistance: document.getElementById("go-distance"),
   menuTitle: document.getElementById("menu-title"),
@@ -34,14 +35,15 @@ export function show(...names) {
 }
 
 export function updateHud({ coins, distance }) {
-  els.hudCoins.textContent = coins;
+  els.hudCoins.textContent = coins + " €";
   els.hudDistance.textContent = Math.floor(distance);
 }
 
-export function updateGameOver({ coins, distance, amount }) {
+export function updateGameOver({ coins, distance, amount, message}) {
   els.goCoins.textContent = coins;
   els.goDistance.textContent = Math.floor(distance);
   els.wonAmount.textContent = formatMoney(amount);
+  els.endMessage.textContent = message;
 }
 
 // Collega i pulsanti una sola volta; ritorna gli handler da riassegnare.

@@ -19,7 +19,7 @@ import { loadTexture } from "../utils/textureLoader.js";
 const PLAYER_MODEL = "test.glb";
 
 // Immagine dei cartelloni ai lati della strada: static/assets/imgs/billboard.png
-const BILLBOARD_IMAGE = "billboard.png";
+const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
@@ -91,14 +91,14 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // ---- Strisce laterali in movimento (senso di velocità) ----
-  const stripes = [];
-  for (let i = 0; i < 20; i++) {
-    const s = MeshBuilder.CreateBox("stripe" + i, { width: 0.15, height: 0.02, depth: 2 }, scene);
-    s.material = stripeMat;
-    const side = i % 2 === 0 ? -3.6 : 3.6;
-    s.position.set(side, 0.02, i * 4);
-    stripes.push(s);
-  }
+  // const stripes = [];
+  // for (let i = 0; i < 20; i++) {
+  //   const s = MeshBuilder.CreateBox("stripe" + i, { width: 0.15, height: 0.02, depth: 2 }, scene);
+  //   s.material = stripeMat;
+  //   const side = i % 2 === 0 ? -3.6 : 3.6;
+  //   s.position.set(side, 0.02, i * 4);
+  //   stripes.push(s);
+  // }
 
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
   const BILLBOARD_X = 5.5; // distanza dal centro strada, oltre le strisce
@@ -106,7 +106,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
   const BILLBOARD_COUNT = 8; // totale, alternati sui due lati
   const billboardMat = new StandardMaterial("billboardMat", scene);
-  billboardMat.diffuseTexture = loadTexture(scene, BILLBOARD_IMAGE);
+  billboardMat.diffuseTexture = loadTexture(scene, SIDE_SLIDING_IMAGE_1);
   billboardMat.specularColor = new Color3(0, 0, 0);
   billboardMat.backFaceCulling = false; // visibile da entrambi i lati del piano
 
@@ -257,8 +257,13 @@ export async function createGameScene({ engine, canvas, goto }) {
   function gameOver() {
     if (!state.running) return;
     state.running = false;
-    const amount = computePayout(state.coins);
-    goto("gameover", { coins: state.coins, distance: state.distance, amount });
+    let payout = computePayout(state.coins);
+    const amount = payout[0];
+    const diff_amount = CONFIG.economy.maxPayout - amount
+    const gameover_message = payout[1] ? "Complimenti per la vincita, ma noi abbiamo solo questi ..." : `${amount}€...davvero?, ${diff_amount}€ te li offriamo noi.`
+    console.log(amount);
+    console.log(gameover_message);
+    goto("gameover", { coins: state.coins, distance: state.distance, amount: CONFIG.economy.maxPayout, message: gameover_message});
   }
 
   ui.show("hud");
@@ -292,10 +297,10 @@ export async function createGameScene({ engine, canvas, goto }) {
       t.position.z -= move;
       if (t.position.z < -TILE_LEN) t.position.z += TILE_LEN * NUM_TILES;
     }
-    for (const s of stripes) {
-      s.position.z -= move;
-      if (s.position.z < DESPAWN_BEHIND) s.position.z += 4 * stripes.length;
-    }
+    // for (const s of stripes) {
+    //   s.position.z -= move;
+    //   if (s.position.z < DESPAWN_BEHIND) s.position.z += 4 * stripes.length;
+    // }
     for (const b of billboards) {
       b.position.z -= move;
       if (b.position.z < DESPAWN_BEHIND) b.position.z += BILLBOARD_GAP * billboards.length;
@@ -338,7 +343,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     state.nextSpawnZ -= move;
     while (state.nextSpawnZ < SPAWN_AHEAD) spawnRow();
 
-    ui.updateHud({ coins: state.coins, distance: state.distance });
+    ui.updateHud({ coins: state.coins * CONFIG.economy.coinValue, distance: state.distance });
   }
 
   function dispose() {

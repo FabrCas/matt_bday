@@ -13,7 +13,7 @@ import { getCameraProfile_menu } from "../utils/responsive.js";
 
 // Scena Game Over: mostra la vincita (overlay HTML) su sfondo 3D sobrio.
 export function createGameOverScene({ engine, payload = {} }) {
-  const { coins = 0, distance = 0, amount = 0 } = payload;
+  const { coins = 0, distance = 0, amount = 0 , message = ""} = payload;
 
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.06, 0.09, 0.16, 1);
@@ -34,9 +34,9 @@ export function createGameOverScene({ engine, payload = {} }) {
   coin.material = mat;
   coin.position.y = 1;
   coin.rotation.x = Math.PI / 2;
-
+  
   ui.show("gameover");
-  ui.updateGameOver({ coins, distance, amount });
+  ui.updateGameOver({ coins, distance, amount, message});
 
   function update(dt) {
     coin.rotation.y += dt * 1.5;
