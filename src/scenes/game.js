@@ -14,6 +14,7 @@ import { getCameraProfile } from "../utils/responsive.js";
 import { CONFIG, computePayout } from "../config/index.js";
 import { loadModel, disposeModel } from "../utils/modelLoader.js";
 import { loadTexture } from "../utils/textureLoader.js";
+import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "test.glb";
@@ -67,6 +68,10 @@ export async function createGameScene({ engine, canvas, goto }) {
   coinMat.diffuseColor = new Color3(0.98, 0.75, 0.15);
   coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
   coinMat.specularColor = new Color3(0, 0, 0);
+  
+  /* sezione caricamento suoni*/
+  const coinSfx = await loadSound(scene, "Coin1.ogg", { volume: 0.8 });
+
 
   // ---- Player (modello importato) ----
   // Nota: 0.8 come altezza da terra e le soglie di collisione più sotto
@@ -332,6 +337,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         co.active = false;
         co.mesh.setEnabled(false);
         state.coins += 1;
+        // coinSfx.play();
       }
       if (co.mesh.position.z < DESPAWN_BEHIND) {
         co.active = false;
@@ -350,6 +356,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     window.removeEventListener("keydown", onKey);
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointerup", onPointerUp);
+    disposeSound(coinSfx);
     disposeModel({ meshes: playerMeshes });
     scene.dispose();
   }
