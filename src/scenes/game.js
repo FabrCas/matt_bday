@@ -109,14 +109,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     c.material = coinMat;
     c.rotation.z = Math.PI / 2;
     c.setEnabled(false);
-<<<<<<< Updated upstream
     if (DEBUG) c.showBoundingBox = true;
-=======
-    
     scene.onBeforeRenderObservable.add(() => {
         c.rotation.y += 0.1;
     });
->>>>>>> Stashed changes
     return { mesh: c, active: false, lane: 0, type: "coin" };
   }
 
