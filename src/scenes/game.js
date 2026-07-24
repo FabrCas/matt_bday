@@ -13,9 +13,13 @@ import * as ui from "../ui/ui.js";
 import { getCameraProfile } from "../utils/responsive.js";
 import { CONFIG, computePayout } from "../config/index.js";
 import { loadModel, disposeModel } from "../utils/modelLoader.js";
+import { loadTexture } from "../utils/textureLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "test.glb";
+
+// Immagine dei cartelloni ai lati della strada: static/assets/imgs/billboard.png
+const BILLBOARD_IMAGE = "billboard.png";
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
@@ -94,6 +98,26 @@ export async function createGameScene({ engine, canvas, goto }) {
     const side = i % 2 === 0 ? -3.6 : 3.6;
     s.position.set(side, 0.02, i * 4);
     stripes.push(s);
+  }
+
+  // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
+  const BILLBOARD_X = 5.5; // distanza dal centro strada, oltre le strisce
+  const BILLBOARD_Y = 1.6; // altezza da terra
+  const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
+  const BILLBOARD_COUNT = 8; // totale, alternati sui due lati
+  const billboardMat = new StandardMaterial("billboardMat", scene);
+  billboardMat.diffuseTexture = loadTexture(scene, BILLBOARD_IMAGE);
+  billboardMat.specularColor = new Color3(0, 0, 0);
+  billboardMat.backFaceCulling = false; // visibile da entrambi i lati del piano
+
+  const billboards = [];
+  for (let i = 0; i < BILLBOARD_COUNT; i++) {
+    const b = MeshBuilder.CreatePlane("billboard" + i, { width: 3, height: 2 }, scene);
+    b.material = billboardMat;
+    const side = i % 2 === 0 ? -BILLBOARD_X : BILLBOARD_X;
+    b.position.set(side, BILLBOARD_Y, i * BILLBOARD_GAP);
+    b.rotation.y = Math.PI / 2; // il piano guarda verso la strada
+    billboards.push(b);
   }
 
   // ---- Pool ostacoli e monete ----
@@ -266,6 +290,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     for (const s of stripes) {
       s.position.z -= move;
       if (s.position.z < DESPAWN_BEHIND) s.position.z += 4 * stripes.length;
+    }
+    for (const b of billboards) {
+      b.position.z -= move;
+      if (b.position.z < DESPAWN_BEHIND) b.position.z += BILLBOARD_GAP * billboards.length;
     }
 
     // Ostacoli e monete: scorrono verso il player.
