@@ -109,29 +109,38 @@ document.getElementById("menu").prepend(logo);
 
 ## audioLoader.js — import di suoni (.mp3 / .ogg)
 
-Wrapper su `Sound` di Babylon.js (audio legato alla scena 3D, incluso audio posizionale),
-più un helper basato su `HTMLAudioElement` nativo per SFX di UI che devono poter suonare
-anche fuori da una scena Babylon attiva (es. click nel menu).
+Wrapper sulla **Audio Engine v2** di Babylon.js (`CreateAudioEngineAsync` / `CreateSoundAsync`,
+non la vecchia classe `Sound`), più un helper basato su `HTMLAudioElement` nativo per SFX di UI
+che devono poter suonare anche fuori dal ciclo di vita di scena/engine audio (es. click nel menu).
+L'audio engine v2 è unico per tutta l'app (non per singola scena): il modulo lo crea da sé al
+primo utilizzo e lo riusa per ogni suono successivo.
 
 ### Setup
 
-Nessuna dipendenza aggiuntiva: `Sound` fa già parte di `@babylonjs/core`.
+Nessuna dipendenza aggiuntiva: fa già parte di `@babylonjs/core`.
 Mettere i file in `static/assets/sounds/`; a runtime sono serviti come `./assets/sounds/<file>`.
 
-> Nota: come tutti i browser, l'audio non parte finché l'utente non ha compiuto
-> un'interazione (click/tap) sulla pagina — avviare la riproduzione da un handler di click
-> (es. il pulsante "GIOCA") copre già questo caso.
+> **Nota (autoplay policy):** i browser sospendono l'`AudioContext` finché l'utente non
+> interagisce con la pagina. Chiamare `unlockAudio()` dentro un handler di click/tap reale
+> (es. il pulsante "GIOCA" — vedi `scenes/menu.js`) prima di riprodurre qualunque suono, altrimenti
+> `.play()` può risultare silenzioso anche se il file si è caricato correttamente.
 
 ### Uso base
 
 ```javascript
-import { loadSound, disposeSound } from "../utils/audioLoader.js";
+import { loadSound, disposeSound, unlockAudio } from "../utils/audioLoader.js";
+
+// in un handler di click (es. bindButtons({ onPlay }) in menu.js)
+onPlay: () => {
+  unlockAudio(); // sblocca l'audio per il resto della sessione
+  goto("game");
+};
 
 // dentro createGameScene({ engine, canvas, goto }) o simile
-const music = await loadSound(scene, "bgm.mp3", { loop: true, volume: 0.4 });
+const music = await loadSound("bgm.mp3", { loop: true, volume: 0.4 });
 music.play();
 
-const coinSfx = await loadSound(scene, "coin.mp3", { volume: 0.8 });
+const coinSfx = await loadSound("coin.mp3", { volume: 0.8 });
 // ad ogni raccolta moneta:
 coinSfx.play();
 
@@ -151,8 +160,8 @@ document.getElementById("btn-play").addEventListener("click", () => playHtmlAudi
 
 ### Note
 
-- **Formato consigliato:** `.mp3` per compatibilità più ampia; `.ogg` come alternativa più
-  leggera dove supportata.
+- **Formato consigliato:** `.mp3` per compatibilità più ampia (incluso Safari/iOS, che non
+  supporta `.ogg`/Vorbis); `.ogg` come alternativa più leggera dove supportata.
 - **Performance / hosting (GitHub Pages):** come da `CLAUDE.md`, tenere i file audio brevi e
   compressi (bitrate contenuto) per non appesantire il caricamento iniziale.
 - **Cleanup:** chiamare `disposeSound(...)` nella `dispose()` della scena per i suoni creati

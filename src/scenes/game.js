@@ -74,7 +74,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // caricamento non deve bloccare l'avvio della scena (vedi audioLoader.js
   // per il perché di un eventuale caricamento lento/fallito).
   let coinSfx = null;
-  loadSound(scene, "Coin1.ogg", { volume: 0.8 }).then((s) => {
+  loadSound("Coin1.ogg", { volume: 0.8 }).then((s) => {
     coinSfx = s;
   });
 

@@ -1,42 +1,42 @@
-// Import di suoni (.mp3, .ogg) come Sound Babylon (audio 3D/scena) o come
-// HTMLAudioElement (SFX di UI, riproducibili anche fuori da una scena attiva).
+// Import di suoni (.mp3, .ogg) tramite l'Audio Engine v2 di Babylon.js
+// (CreateAudioEngineAsync/CreateSoundAsync) o come HTMLAudioElement (SFX di UI,
+// riproducibili anche fuori dal ciclo di vita di una scena/engine audio).
 // Vedi README.md in questa cartella per esempi d'uso e note sull'integrazione.
 
-import { Sound } from "@babylonjs/core";
+import { CreateAudioEngineAsync, CreateSoundAsync } from "@babylonjs/core";
 
 // Tutti i suoni vivono qui (vedi struttura in CLAUDE.md).
 // `publicDir` di Vite è "./static", quindi a runtime la cartella è servita
 // alla radice come "./assets/sounds/".
 export const SOUNDS_BASE_PATH = "./assets/sounds/";
 
-// Oltre questo tempo la Promise si risolve comunque: `Sound` di Babylon non
-// garantisce un callback di errore affidabile (file mancante/non decodificabile
-// può non richiamare mai `readyToPlayCallback`), quindi senza un timeout un
-// `await loadSound(...)` potrebbe restare appeso per sempre.
-const SOUND_LOAD_TIMEOUT_MS = 8000;
-
-// Carica un suono legato alla scena Babylon (colonna sonora, SFX 3D posizionali).
-// Ritorna una Promise che si risolve quando il suono è pronto alla riproduzione,
-// o comunque entro SOUND_LOAD_TIMEOUT_MS (vedi sopra).
-//
-// options: le stesse opzioni accettate da `Sound` (loop, volume, spatialSound, ecc.)
-export function loadSound(scene, fileName, options = {}) {
-  return new Promise((resolve) => {
-    let settled = false;
-    const sound = new Sound(fileName, SOUNDS_BASE_PATH + fileName, scene, () => {
-      settled = true;
-      resolve(sound);
-    }, options);
-
-    setTimeout(() => {
-      if (settled) return;
-      console.warn(`[audioLoader] "${fileName}" non pronto dopo ${SOUND_LOAD_TIMEOUT_MS}ms, proseguo senza attendere oltre.`);
-      resolve(sound);
-    }, SOUND_LOAD_TIMEOUT_MS);
-  });
+// L'Audio Engine v2 è unico per tutta l'app (non legato a una singola scena):
+// lo creiamo una sola volta al primo utilizzo e lo riusiamo per ogni suono.
+let audioEnginePromise = null;
+function getAudioEngine() {
+  if (!audioEnginePromise) audioEnginePromise = CreateAudioEngineAsync();
+  return audioEnginePromise;
 }
 
-// Rilascia un Sound Babylon (buffer audio e handler associati).
+// Da chiamare dentro un handler di interazione utente (click/tap, es. il
+// pulsante "GIOCA"): i browser sospendono l'AudioContext finché l'utente non
+// interagisce con la pagina, `unlockAsync()` lo sblocca in quel momento.
+export async function unlockAudio() {
+  const engine = await getAudioEngine();
+  if (engine.state !== "running") await engine.unlockAsync();
+  return engine;
+}
+
+// Carica un suono (musica, SFX). Ritorna una Promise risolta con l'oggetto
+// Sound, pronto per `.play()`.
+//
+// options: opzioni accettate da CreateSoundAsync (loop, volume, ecc.)
+export async function loadSound(fileName, options = {}) {
+  await getAudioEngine();
+  return CreateSoundAsync(fileName, SOUNDS_BASE_PATH + fileName, options);
+}
+
+// Rilascia un Sound (buffer audio e handler associati).
 export function disposeSound(sound) {
   sound?.dispose();
 }

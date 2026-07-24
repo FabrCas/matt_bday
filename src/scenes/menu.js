@@ -10,6 +10,7 @@ import {
 } from "@babylonjs/core";
 import * as ui from "../ui/ui.js";
 import { getCameraProfile_menu } from "../utils/responsive.js";
+import { unlockAudio } from "../utils/audioLoader.js";
 
 // Scena Menu: sfondo 3D leggero (una forma che ruota) + overlay HTML per i testi.
 export function createMenuScene({ engine, goto }) {
@@ -37,8 +38,16 @@ export function createMenuScene({ engine, goto }) {
   // Un solo binding dei pulsanti per l'intera vita dell'app.
   if (!createMenuScene._bound) {
     ui.bindButtons({
-      onPlay: () => goto("game"),
-      onRetry: () => goto("game"),
+      // unlockAudio() va chiamato dentro un gesture utente (click): sblocca
+      // l'AudioContext sospeso di default dai browser per policy autoplay.
+      onPlay: () => {
+        unlockAudio();
+        goto("game");
+      },
+      onRetry: () => {
+        unlockAudio();
+        goto("game");
+      },
       onMenu: () => goto("menu"),
     });
     createMenuScene._bound = true;
