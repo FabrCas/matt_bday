@@ -12,6 +12,10 @@ import {
 import * as ui from "../ui/ui.js";
 import { getCameraProfile } from "../utils/responsive.js";
 import { CONFIG, computePayout } from "../config/index.js";
+import { loadModel, disposeModel } from "../utils/modelLoader.js";
+
+// Modello del player: static/assets/3d-models/character.glb
+const PLAYER_MODEL = "character.glb";
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
@@ -26,7 +30,7 @@ const SPAWN_AHEAD = G.spawnAhead; // distanza a cui vengono generati gli oggetti
 const DESPAWN_BEHIND = -12; // dietro la camera -> riciclo/rimozione (interno)
 const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
 
-export function createGameScene({ engine, canvas, goto }) {
+export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.53, 0.81, 0.92, 1); // cielo azzurro
 
@@ -59,13 +63,15 @@ export function createGameScene({ engine, canvas, goto }) {
   coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
   coinMat.specularColor = new Color3(0, 0, 0);
 
-  // ---- Player ----
-  const player = MeshBuilder.CreateCapsule("player", { radius: 0.5, height: 1.6 }, scene);
-  const playerMat = new StandardMaterial("playerMat", scene);
-  playerMat.diffuseColor = new Color3(0.22, 0.5, 0.95);
-  playerMat.specularColor = new Color3(0.1, 0.1, 0.1);
-  player.material = playerMat;
-  player.position.set(0, 0.8, 0);
+  // ---- Player (modello importato) ----
+  // Nota: 0.8 come altezza da terra e le soglie di collisione più sotto
+  // (py < 1.6, |py - 1.0| < 1.1) erano tarate sulla capsula placeholder;
+  // vanno riverificate/aggiustate in base alle dimensioni reali del modello
+  // (scaling, pivot) una volta importato character.glb.
+  const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
+    position: new Vector3(0, 0.8, 0),
+    // scaling: new Vector3(1, 1, 1), // tarare in base alle dimensioni reali del modello
+  });
 
   // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
   const TILE_LEN = 30;
@@ -302,6 +308,7 @@ export function createGameScene({ engine, canvas, goto }) {
     window.removeEventListener("keydown", onKey);
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointerup", onPointerUp);
+    disposeModel({ meshes: playerMeshes });
     scene.dispose();
   }
 

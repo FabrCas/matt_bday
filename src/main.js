@@ -24,12 +24,18 @@ const factories = {
 let active = null;
 
 // Cambio scena centralizzato. `payload` passa dati tra scene (es. punteggio).
-function goto(name, payload) {
+// `async` perché alcune scene (es. game, che importa il modello del player)
+// caricano asset prima di essere pronte: la scena precedente resta visibile
+// (dietro all'overlay "loading") finché la nuova non è completamente costruita.
+async function goto(name, payload) {
   const factory = factories[name];
   if (!factory) throw new Error(`Scena sconosciuta: ${name}`);
 
+  ui.show("loading");
+  const next = await factory({ engine, canvas, goto, payload });
+
   const previous = active;
-  active = factory({ engine, canvas, goto, payload });
+  active = next;
   // Dispose della precedente solo dopo aver creato la nuova (transizione pulita).
   if (previous) previous.dispose();
 }
