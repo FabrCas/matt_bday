@@ -69,8 +69,14 @@ export async function createGameScene({ engine, canvas, goto }) {
   coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
   coinMat.specularColor = new Color3(0, 0, 0);
   
-  /* sezione caricamento suoni*/
-  const coinSfx = await loadSound(scene, "Coin1.ogg", { volume: 0.8 });
+  // ---- Suoni ----
+  // Non in `await`: un SFX non è critico per il gioco, quindi il suo
+  // caricamento non deve bloccare l'avvio della scena (vedi audioLoader.js
+  // per il perché di un eventuale caricamento lento/fallito).
+  let coinSfx = null;
+  loadSound(scene, "Coin1.ogg", { volume: 0.8 }).then((s) => {
+    coinSfx = s;
+  });
 
 
   // ---- Player (modello importato) ----
@@ -337,7 +343,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         co.active = false;
         co.mesh.setEnabled(false);
         state.coins += 1;
-        // coinSfx.play();
+        coinSfx?.play();
       }
       if (co.mesh.position.z < DESPAWN_BEHIND) {
         co.active = false;

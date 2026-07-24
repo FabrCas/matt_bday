@@ -9,19 +9,30 @@ import { Sound } from "@babylonjs/core";
 // alla radice come "./assets/sounds/".
 export const SOUNDS_BASE_PATH = "./assets/sounds/";
 
+// Oltre questo tempo la Promise si risolve comunque: `Sound` di Babylon non
+// garantisce un callback di errore affidabile (file mancante/non decodificabile
+// può non richiamare mai `readyToPlayCallback`), quindi senza un timeout un
+// `await loadSound(...)` potrebbe restare appeso per sempre.
+const SOUND_LOAD_TIMEOUT_MS = 8000;
+
 // Carica un suono legato alla scena Babylon (colonna sonora, SFX 3D posizionali).
-// Ritorna una Promise risolta quando il suono è pronto alla riproduzione.
+// Ritorna una Promise che si risolve quando il suono è pronto alla riproduzione,
+// o comunque entro SOUND_LOAD_TIMEOUT_MS (vedi sopra).
 //
 // options: le stesse opzioni accettate da `Sound` (loop, volume, spatialSound, ecc.)
 export function loadSound(scene, fileName, options = {}) {
-  return new Promise((resolve, reject) => {
-    const sound = new Sound(
-      fileName,
-      SOUNDS_BASE_PATH + fileName,
-      scene,
-      () => resolve(sound),
-      { ...options, errorCallback: reject }
-    );
+  return new Promise((resolve) => {
+    let settled = false;
+    const sound = new Sound(fileName, SOUNDS_BASE_PATH + fileName, scene, () => {
+      settled = true;
+      resolve(sound);
+    }, options);
+
+    setTimeout(() => {
+      if (settled) return;
+      console.warn(`[audioLoader] "${fileName}" non pronto dopo ${SOUND_LOAD_TIMEOUT_MS}ms, proseguo senza attendere oltre.`);
+      resolve(sound);
+    }, SOUND_LOAD_TIMEOUT_MS);
   });
 }
 
