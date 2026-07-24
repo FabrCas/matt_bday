@@ -5,6 +5,7 @@ import userConfig from "./game.config.yaml";
 
 // Valori di fallback = "fonte di verità" della forma della config.
 const defaults = {
+  debug: false,
   game: {
     title: "Runner",
     subtitle: "",

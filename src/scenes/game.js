@@ -29,6 +29,7 @@ const ACCEL = G.acceleration; // incremento velocità nel tempo
 const SPAWN_AHEAD = G.spawnAhead; // distanza a cui vengono generati gli oggetti
 const DESPAWN_BEHIND = -12; // dietro la camera -> riciclo/rimozione (interno)
 const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
+const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
 
 export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
@@ -72,6 +73,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     position: new Vector3(0, 0.8, 0),
     // scaling: new Vector3(1, 1, 1), // tarare in base alle dimensioni reali del modello
   });
+  if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
 
   // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
   const TILE_LEN = 30;
@@ -99,6 +101,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     const o = MeshBuilder.CreateBox("obs" + i, { width: 1.4, height: 1.4, depth: 1.4 }, scene);
     o.material = obstacleMat;
     o.setEnabled(false);
+    if (DEBUG) o.showBoundingBox = true;
     return { mesh: o, active: false, lane: 0, type: "obstacle" };
   }
   function makeCoin(i) {
@@ -106,6 +109,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     c.material = coinMat;
     c.rotation.z = Math.PI / 2;
     c.setEnabled(false);
+    if (DEBUG) c.showBoundingBox = true;
     return { mesh: c, active: false, lane: 0, type: "coin" };
   }
   const obstacles = Array.from({ length: 12 }, (_, i) => makeObstacle(i));
