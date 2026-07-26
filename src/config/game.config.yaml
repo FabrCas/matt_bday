@@ -22,9 +22,9 @@ game:
 # --- Economia / vincita ---
 economy:
   currencySymbol: "€"
-  coinValue: 0.5          # valore in valuta di ogni moneta raccolta
+  coinValue: 0.25          # valore in valuta di ogni moneta raccolta
   # Vincita massima raggiungibile (0 = nessun tetto).
-  maxPayout: 10  # quota regalo
+  maxPayout: 100 # quota regalo
 
 # --- Parametri di gameplay (endless runner a corsie) ---
 gameplay:
