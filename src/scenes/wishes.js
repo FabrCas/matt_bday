@@ -34,7 +34,7 @@ const FACE_1 = "face_kermit.png";
 // ogni frame (niente TransformNode padre + billboard) perché in Babylon.js
 // un mesh in billboardMode non eredita in modo affidabile la rotazione del
 // genitore: l'orbita andrebbe persa (i piani resterebbero fermi).
-export function createWishesScene({ engine }) {
+export async function createWishesScene({ engine }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.06, 0.09, 0.16, 1);
 
@@ -94,6 +94,13 @@ export function createWishesScene({ engine }) {
     }
   }
   positionGallery();
+
+  // `goto()` in main.js mostra la schermata "loading" prima di chiamare questa
+  // factory e la nasconde solo quando la promise ritornata si risolve: qui
+  // aspettiamo che texture/materiali/mesh siano tutti pronti (incluse le
+  // prossime texture che verranno aggiunte) prima di mostrare la scena, così
+  // non si vedono i piani "vuoti"/grigi lampeggiare mentre caricano.
+  await scene.whenReadyAsync(true);
 
   ui.show("wishes");
   ui.updateWishes();
