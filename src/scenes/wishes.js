@@ -61,7 +61,10 @@ export function createWishesScene({ engine }) {
 
   const galleryPlaneMat = new StandardMaterial("wishesGalleryMat", scene);
   // galleryPlaneMat.diffuseColor = new Color3(0.75, 0.75, 0.8);
-  galleryPlaneMat.diffuseTexture = loadTexture(scene, FACE_1);
+  const galleryTexture = loadTexture(scene, FACE_1);
+  galleryTexture.hasAlpha = true; // il png ha canale alpha: va dichiarato esplicitamente
+  galleryPlaneMat.diffuseTexture = galleryTexture;
+  galleryPlaneMat.useAlphaFromDiffuseTexture = true; // usa l'alpha della texture per la trasparenza
   galleryPlaneMat.emissiveColor = new Color3(0.75, 0.75, 0.8);
   galleryPlaneMat.specularColor = new Color3(0, 0, 0);
   galleryPlaneMat.backFaceCulling = true;
