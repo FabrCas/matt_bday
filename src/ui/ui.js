@@ -47,9 +47,8 @@ export function updateGameOver({ coins, distance, amount, message}) {
   els.goDistance.textContent = Math.floor(distance);
   els.wonAmount.textContent = formatMoney(amount);
   els.endMessage.textContent = message;
-  els.btnRetry.classList.toggle("hidden", !CONFIG.game.allowReplay);
+  els.btnRetry.classList.toggle("hidden", !CONFIG.debug && !CONFIG.game.allowReplay);
 }
-
 export function updateWishes() {
   els.wishesMessage.textContent = CONFIG.game.wishesMessage;
 }

@@ -15,9 +15,9 @@ game:
   subtitle: "Raccogli più monete che puoi!"
   # Se false, nella schermata di game over non compare il bottone "rigioca"
   # (es. per disattivare i replay dopo l'evento).
-  allowReplay: true
+  allowReplay: false
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
-  wishesMessage: "Tanti auguri! 🎉"
+  wishesMessage: "Tanti auguri! Matthew"
 
 # --- Economia / vincita ---
 economy:
