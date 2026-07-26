@@ -59,8 +59,18 @@ export function createWishesScene({ engine }) {
 
   const galleryPlaneMat = new StandardMaterial("wishesGalleryMat", scene);
   galleryPlaneMat.diffuseColor = new Color3(0.75, 0.75, 0.8);
+  galleryPlaneMat.emissiveColor = new Color3(0.75, 0.75, 0.8);
   galleryPlaneMat.specularColor = new Color3(0, 0, 0);
   galleryPlaneMat.backFaceCulling = false;
+  // Illuminazione disattivata: ogni piano orbita sempre rivolto verso la
+  // camera (billboard), ma la sua normale rispetto alla luce di scena varia
+  // comunque leggermente in base alla posizione, rendendo alcuni piani più
+  // scuri di altri. Con `disableLighting` il colore/texture del piano è
+  // sempre quello di `emissiveColor`/texture, identico per tutti a
+  // prescindere dall'angolo di orbita o dalle luci della scena: quando ci
+  // saranno le immagini reali, saranno tutte leggibili con la stessa
+  // luminosità.
+  galleryPlaneMat.disableLighting = true;
 
   const galleryPlanes = [];
   for (let i = 0; i < GALLERY_PLANE_COUNT; i++) {

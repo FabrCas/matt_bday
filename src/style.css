@@ -68,8 +68,12 @@ html, body {
 
 .title {
   font-size: clamp(2.5rem, 12vw, 5rem);
-  line-height: 1;
+  /* >1 (invece di 1) + padding: con background-clip:text la sfumatura
+     ritaglia esattamente il box di testo, e con line-height:1 alcuni
+     glifi (es. "g", "!", accenti) sporgono oltre il box e vengono tagliati. */
+  line-height: 1.25;
   margin: 0;
+  padding: 0.1em 0;
   font-weight: 800;
   letter-spacing: 0.02em;
   background: linear-gradient(120deg, var(--accent), var(--accent-2));
