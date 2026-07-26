@@ -69,11 +69,6 @@ export async function createGameScene({ engine, canvas, goto }) {
   groundMat.diffuseColor = new Color3(0.5, 0.5, 0.5);
   groundMat.specularColor = new Color3(0, 0, 0);
 
-  // const stripeMat = new StandardMaterial("stripeMat", scene);
-  // stripeMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
-
-  // stripeMat.specularColor = new Color3(0, 0, 0);
-
   const wallMat = new StandardMaterial("wallMat", scene);
   wallMat.diffuseColor = new Color3(0.55, 0.55, 0.58);
   wallMat.specularColor = new Color3(0, 0, 0);
@@ -197,23 +192,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     // Nota risorse (hosting statico su GitHub Pages, vedi CLAUDE.md): ogni
     // point light aggiuntiva ha un costo; LAMP_COUNT è tenuto basso perché
     // solo quelle vicine al player contribuiscono in modo visibile.
-
     lamps.push({ box, light });
   }
 
-  // ---- Strisce laterali in movimento (senso di velocità) ----
-  // const stripes = [];
-  // for (let i = 0; i < 20; i++) {
-  //   const s = MeshBuilder.CreateBox("stripe" + i, { width: 0.15, height: 0.02, depth: 2 }, scene);
-  //   s.material = stripeMat;
-  //   const side = i % 2 === 0 ? -3.6 : 3.6;
-  //   s.position.set(side, 0.02, i * 4);
-  //   stripes.push(s);
-  // }
-
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
-  // Leggermente più vicini al centro rispetto al muro, così restano "appoggiati"
-  // sulla sua superficie invece di essere coplanari (che causava clipping/z-fighting).
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
   const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
   const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
