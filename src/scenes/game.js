@@ -192,7 +192,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     b.material = billboardMat;
     const side = i % 2 === 0 ? -BILLBOARD_X : BILLBOARD_X;
     b.position.set(side, BILLBOARD_Y, i * BILLBOARD_GAP);
-    b.rotation.y = Math.PI / 2; // il piano guarda verso la strada
+    // Stesso problema dei muri: senza specchiare in base al lato, entrambi i
+    // cartelloni avrebbero la normale vera rivolta nella stessa direzione
+    // mondiale, e quelli sul lato sinistro risulterebbero sempre in ombra.
+    b.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2; // normale rivolta verso il centro strada
     billboards.push(b);
   }
 
