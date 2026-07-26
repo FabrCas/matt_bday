@@ -58,11 +58,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   const camera = new FreeCamera("gameCam", new Vector3(0, cam.height, -cam.distance), scene);
   camera.fov = cam.fov;
 
-  // ---- Luci (leggere: hemispheric + una direzionale, niente ombre) ----
+  // ---- Luci (leggere: hemispheric di riempimento, niente ombre) ----
+  // Le point light "vere" sono quelle dei lampadari più sotto, riciclate
+  // lungo il corridoio insieme al resto della scena.
   const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
   hemi.intensity = 0.2;
-  const sun = new PointLight("sun", new Vector3(0,WALL_HEIGHT -3 ,0), scene);
-  sun.intensity = 0.9;
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
   const groundMat = new StandardMaterial("groundMat", scene);
@@ -164,6 +164,40 @@ export async function createGameScene({ engine, canvas, goto }) {
     c.rotation.x = -Math.PI / 2; // piano orizzontale, normale rivolta verso il basso
     c.position.set(0, WALL_HEIGHT, i * TILE_LEN);
     ceilings.push(c);
+  }
+
+  // ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
+  // Placeholder: in seguito il box verrà sostituito da un modello importato.
+  // Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
+  // in modo che si sposti in sincrono (la posizione della luce viene
+  // aggiornata a mano in update(), i Light di Babylon non seguono in modo
+  // affidabile un parent come i mesh).
+  const LAMP_GAP = 18; // distanza tra un lampadario e il successivo
+  const LAMP_COUNT = 5; // numero di lampadari attivi contemporaneamente
+  const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
+  const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
+  const LAMP_BOX_SIZE = 0.8;
+
+  const lampMat = new StandardMaterial("lampMat", scene);
+  lampMat.diffuseColor = new Color3(0.95, 0.85, 0.2);
+  lampMat.emissiveColor = new Color3(0.6, 0.5, 0.05);
+  lampMat.specularColor = new Color3(0, 0, 0);
+
+  const lamps = [];
+  for (let i = 0; i < LAMP_COUNT; i++) {
+    const z = i * LAMP_GAP;
+    const box = MeshBuilder.CreateBox("lampBox" + i, { size: LAMP_BOX_SIZE }, scene);
+    box.material = lampMat;
+    box.position.set(0, LAMP_BOX_Y, z);
+
+    const light = new PointLight("lampLight" + i, new Vector3(0, LAMP_BOX_Y - LAMP_LIGHT_DROP, z), scene);
+    light.diffuse = new Color3(1, 0.95, 0.8);
+    light.intensity = 0.6;
+    // Nota risorse (hosting statico su GitHub Pages, vedi CLAUDE.md): ogni
+    // point light aggiuntiva ha un costo; LAMP_COUNT è tenuto basso perché
+    // solo quelle vicine al player contribuiscono in modo visibile.
+
+    lamps.push({ box, light });
   }
 
   // ---- Strisce laterali in movimento (senso di velocità) ----
@@ -432,6 +466,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     for (const b of billboards) {
       b.position.z -= move;
       if (b.position.z < DESPAWN_BEHIND) b.position.z += BILLBOARD_GAP * billboards.length;
+    }
+    for (const l of lamps) {
+      l.box.position.z -= move;
+      l.light.position.z -= move;
+      if (l.box.position.z < DESPAWN_BEHIND) {
+        l.box.position.z += LAMP_GAP * LAMP_COUNT;
+        l.light.position.z += LAMP_GAP * LAMP_COUNT;
+      }
     }
 
     // Ostacoli e monete: scorrono verso il player.
