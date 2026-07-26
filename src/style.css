@@ -62,6 +62,14 @@ html, body {
   flex-shrink: 0;
 }
 
+/* La scena auguri mostra la galleria 3D (piani orbitanti) dietro al testo:
+   niente sfondo/blur qui, altrimenti il "backdrop-filter: blur" sfoca anche
+   il canvas visibile dietro l'overlay (era l'effetto "offuscato" segnalato). */
+#wishes {
+  background: none;
+  backdrop-filter: none;
+}
+
 .hidden {
   display: none !important;
 }
