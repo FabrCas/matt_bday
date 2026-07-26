@@ -61,7 +61,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // ---- Luci (leggere: hemispheric + una direzionale, niente ombre) ----
   const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
   hemi.intensity = 0.2;
-  const sun = new PointLight("sun", new Vector3(0,WALL_HEIGHT -1 ,0), scene);
+  const sun = new PointLight("sun", new Vector3(0,WALL_HEIGHT -3 ,0), scene);
   sun.intensity = 0.9;
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
@@ -180,7 +180,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // Leggermente più vicini al centro rispetto al muro, così restano "appoggiati"
   // sulla sua superficie invece di essere coplanari (che causava clipping/z-fighting).
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
-  const BILLBOARD_Y = 1.6; // altezza da terra
+  const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
   const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
   const BILLBOARD_COUNT = 8; // totale, alternati sui due lati
   const BILLBOARD_WIDTH = 3;
@@ -198,9 +198,9 @@ export async function createGameScene({ engine, canvas, goto }) {
   const FRAME_OFFSET = FRAME_THICKNESS / 2 + 0.02; // dietro l'immagine, verso il muro
   const billboardFrameMat = new StandardMaterial("billboardFrameMat", scene);
   billboardFrameMat.diffuseColor = new Color3(1, 1, 1);
-  billboardFrameMat.emissiveColor = new Color3(1, 1, 1);
-  billboardFrameMat.specularColor = new Color3(0, 0, 0);
-  billboardFrameMat.disableLighting = true;
+  // billboardFrameMat.emissiveColor = new Color3(1, 1, 1);
+  billboardFrameMat.specularColor = new Color3(1, 1, 1); 
+  billboardFrameMat.disableLighting = false;
 
   const billboards = [];
   for (let i = 0; i < BILLBOARD_COUNT; i++) {
