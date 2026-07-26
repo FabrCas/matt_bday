@@ -173,6 +173,12 @@ export async function createGameScene({ engine, canvas, goto }) {
   const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
   const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
   const LAMP_BOX_SIZE = 0.8;
+  const LAMP_INTENSITY = 0.6;
+  // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
+  // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
+  // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
+  // in modo visibile, dando l'effetto di "spegnimento di colpo".
+  const LAMP_FADE_DISTANCE = 6;
 
   const lampMat = new StandardMaterial("lampMat", scene);
   lampMat.diffuseColor = new Color3(0.95, 0.85, 0.2);
@@ -186,9 +192,12 @@ export async function createGameScene({ engine, canvas, goto }) {
     box.material = lampMat;
     box.position.set(0, LAMP_BOX_Y, z);
 
-    const light = new PointLight("lampLight" + i, new Vector3(0, LAMP_BOX_Y - LAMP_LIGHT_DROP, z), scene);
+    // Posizione iniziale della luce ricavata dal box (vedi update(): resta
+    // sempre derivata da esso, non c'è uno stato separato che possa
+    // disallinearsi).
+    const light = new PointLight("lampLight" + i, Vector3.Zero(), scene);
     light.diffuse = new Color3(1, 0.95, 0.8);
-    light.intensity = 0.6;
+    light.intensity = LAMP_INTENSITY;
     // Nota risorse (hosting statico su GitHub Pages, vedi CLAUDE.md): ogni
     // point light aggiuntiva ha un costo; LAMP_COUNT è tenuto basso perché
     // solo quelle vicine al player contribuiscono in modo visibile.
@@ -452,11 +461,21 @@ export async function createGameScene({ engine, canvas, goto }) {
     }
     for (const l of lamps) {
       l.box.position.z -= move;
-      l.light.position.z -= move;
       if (l.box.position.z < DESPAWN_BEHIND) {
         l.box.position.z += LAMP_GAP * LAMP_COUNT;
-        l.light.position.z += LAMP_GAP * LAMP_COUNT;
       }
+      // Luce sempre allineata al box: posizione ricavata da esso ogni frame
+      // invece di un secondo stato aggiornato in parallelo.
+      l.light.position.x = l.box.position.x;
+      l.light.position.y = l.box.position.y - LAMP_LIGHT_DROP;
+      l.light.position.z = l.box.position.z;
+
+      // Dissolvenza vicino al bordo di riciclo: l'intensità scende a 0 prima
+      // che il lampadario venga teletrasportato in avanti, così il "salto"
+      // non si vede più come uno spegnimento improvviso.
+      const distFromRecycle = l.box.position.z - DESPAWN_BEHIND;
+      const fade = Math.min(1, Math.max(0, distFromRecycle / LAMP_FADE_DISTANCE));
+      l.light.intensity = LAMP_INTENSITY * fade;
     }
 
     // Ostacoli e monete: scorrono verso il player.
