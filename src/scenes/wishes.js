@@ -11,11 +11,13 @@ import {
 } from "@babylonjs/core";
 import * as ui from "../ui/ui.js";
 import { getCameraProfile_menu } from "../utils/responsive.js";
+import { loadTexture } from "../utils/textureLoader.js";
 import { CONFIG } from "../config/index.js";
 
 // Numero di piani quadrati che orbitano intorno al testo (configurabile in
 // game.config.yaml, sezione `wishes.galleryPlaneCount`).
 const GALLERY_PLANE_COUNT = CONFIG.wishes.galleryPlaneCount;
+const FACE_1 = "face_kermit.png";
 
 // Scena Auguri: raggiunta dal bottone "continua" del game over. Il testo di
 // auguri resta al centro (overlay HTML, come prima). Intorno, allo stesso
@@ -53,23 +55,16 @@ export function createWishesScene({ engine }) {
   // Raggio proporzionato al semi-campo visivo a quella distanza, con un
   // margine di sicurezza: il cerchio resta sempre più ampio della zona
   // centrale dove sta il testo, su qualunque device.
-  const GALLERY_RADIUS = cam.distance * Math.tan(cam.fov / 2) * 0.55;
+  const GALLERY_RADIUS = cam.distance * Math.tan(cam.fov / 2) * 0.75;
   const PLANE_SIZE = GALLERY_RADIUS * 0.5; // piani quadrati
-  const GALLERY_ROTATION_SPEED = 0.6; // rad/s
+  const GALLERY_ROTATION_SPEED = 0.4; // rad/s
 
   const galleryPlaneMat = new StandardMaterial("wishesGalleryMat", scene);
-  galleryPlaneMat.diffuseColor = new Color3(0.75, 0.75, 0.8);
+  // galleryPlaneMat.diffuseColor = new Color3(0.75, 0.75, 0.8);
+  galleryPlaneMat.diffuseTexture = loadTexture(scene, FACE_1);
   galleryPlaneMat.emissiveColor = new Color3(0.75, 0.75, 0.8);
   galleryPlaneMat.specularColor = new Color3(0, 0, 0);
-  galleryPlaneMat.backFaceCulling = false;
-  // Illuminazione disattivata: ogni piano orbita sempre rivolto verso la
-  // camera (billboard), ma la sua normale rispetto alla luce di scena varia
-  // comunque leggermente in base alla posizione, rendendo alcuni piani più
-  // scuri di altri. Con `disableLighting` il colore/texture del piano è
-  // sempre quello di `emissiveColor`/texture, identico per tutti a
-  // prescindere dall'angolo di orbita o dalle luci della scena: quando ci
-  // saranno le immagini reali, saranno tutte leggibili con la stessa
-  // luminosità.
+  galleryPlaneMat.backFaceCulling = true;
   galleryPlaneMat.disableLighting = true;
 
   const galleryPlanes = [];
