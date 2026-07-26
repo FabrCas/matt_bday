@@ -3,6 +3,7 @@ import {
   FreeCamera,
   HemisphericLight,
   DirectionalLight,
+  PointLight,
   MeshBuilder,
   StandardMaterial,
   Color3,
@@ -37,6 +38,11 @@ const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
 const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete allo spawn
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
 
+// ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
+const TILE_LEN = 30;
+const NUM_TILES = 4;
+const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
+const WALL_HEIGHT = 10;
 export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.53, 0.81, 0.92, 1); // cielo azzurro
@@ -54,9 +60,9 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   // ---- Luci (leggere: hemispheric + una direzionale, niente ombre) ----
   const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
-  hemi.intensity = 0.85;
-  const sun = new DirectionalLight("sun", new Vector3(-0.4, -1, 0.6), scene);
-  sun.intensity = 0.6;
+  hemi.intensity = 0.2;
+  const sun = new PointLight("sun", new Vector3(0,WALL_HEIGHT -1 ,0), scene);
+  sun.intensity = 0.9;
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
   const groundMat = new StandardMaterial("groundMat", scene);
@@ -102,11 +108,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   });
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
 
-  // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
-  const TILE_LEN = 30;
-  const NUM_TILES = 4;
-  const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
-  const WALL_HEIGHT = 10;
+
 
   // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
   // Larghezza pari alla distanza tra i due muri, così il pavimento li tocca
