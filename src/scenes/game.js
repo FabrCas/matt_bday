@@ -60,6 +60,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   stripeMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
   stripeMat.specularColor = new Color3(0, 0, 0);
 
+  const wallMat = new StandardMaterial("wallMat", scene);
+  wallMat.diffuseColor = new Color3(0.55, 0.55, 0.58);
+  wallMat.specularColor = new Color3(0, 0, 0);
+  wallMat.backFaceCulling = false;
+
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
   obstacleMat.diffuseColor = new Color3(0.85, 0.2, 0.25);
   obstacleMat.specularColor = new Color3(0, 0, 0);
@@ -99,6 +104,25 @@ export async function createGameScene({ engine, canvas, goto }) {
     t.material = groundMat;
     t.position.set(0, -0.25, i * TILE_LEN);
     tiles.push(t);
+  }
+
+  // ---- Muri laterali del corridoio (piani grigi, riciclati come i tile) ----
+  // Stessa lunghezza/numero segmenti dei tile del terreno, così scorrono in sync.
+  const WALL_X = 5.5; // stesso offset dei billboard: i billboard vi si "appoggiano"
+  const WALL_HEIGHT = 6;
+  const walls = [];
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < NUM_TILES; i++) {
+      const w = MeshBuilder.CreatePlane(
+        "wall" + side + "_" + i,
+        { width: TILE_LEN, height: WALL_HEIGHT },
+        scene
+      );
+      w.material = wallMat;
+      w.rotation.y = Math.PI / 2; // piano verticale, rivolto verso il centro strada
+      w.position.set(side * WALL_X, WALL_HEIGHT / 2, i * TILE_LEN);
+      walls.push(w);
+    }
   }
 
   // ---- Strisce laterali in movimento (senso di velocità) ----
@@ -307,6 +331,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     for (const t of tiles) {
       t.position.z -= move;
       if (t.position.z < -TILE_LEN) t.position.z += TILE_LEN * NUM_TILES;
+    }
+    for (const w of walls) {
+      w.position.z -= move;
+      if (w.position.z < -TILE_LEN) w.position.z += TILE_LEN * NUM_TILES;
     }
     // for (const s of stripes) {
     //   s.position.z -= move;
