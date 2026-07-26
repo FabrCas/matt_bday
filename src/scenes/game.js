@@ -40,6 +40,12 @@ export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.53, 0.81, 0.92, 1); // cielo azzurro
 
+  // Fog per dissolvere il fondo del corridoio infinito nella foschia del cielo,
+  // nascondendo così il riciclo dei segmenti (muri/tile/billboard) in lontananza.
+  scene.fogMode = Scene.FOGMODE_EXP2;
+  scene.fogColor = new Color3(0.53, 0.81, 0.92);
+  scene.fogDensity = 0.02;
+
   // ---- Camera (dietro il player, adattata al dispositivo) ----
   const cam = getCameraProfile();
   const camera = new FreeCamera("gameCam", new Vector3(0, cam.height, -cam.distance), scene);
