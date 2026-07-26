@@ -34,6 +34,7 @@ const ACCEL = G.acceleration; // incremento velocità nel tempo
 const SPAWN_AHEAD = G.spawnAhead; // distanza a cui vengono generati gli oggetti
 const DESPAWN_BEHIND = -12; // dietro la camera -> riciclo/rimozione (interno)
 const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
+const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete allo spawn
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
 
 export async function createGameScene({ engine, canvas, goto }) {
@@ -101,12 +102,22 @@ export async function createGameScene({ engine, canvas, goto }) {
   });
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
 
-  // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
+  // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
   const TILE_LEN = 30;
   const NUM_TILES = 4;
+  const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
+  const WALL_HEIGHT = 10;
+
+  // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
+  // Larghezza pari alla distanza tra i due muri, così il pavimento li tocca
+  // invece di lasciare uno spazio vuoto ai lati.
   const tiles = [];
   for (let i = 0; i < NUM_TILES; i++) {
-    const t = MeshBuilder.CreateBox("tile" + i, { width: 8, height: 0.5, depth: TILE_LEN }, scene);
+    const t = MeshBuilder.CreateBox(
+      "tile" + i,
+      { width: CORRIDOR_HALF_WIDTH * 2, height: 0.5, depth: TILE_LEN },
+      scene
+    );
     t.material = groundMat;
     t.position.set(0, -0.25, i * TILE_LEN);
     tiles.push(t);
@@ -114,8 +125,6 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   // ---- Muri laterali del corridoio (piani grigi, riciclati come i tile) ----
   // Stessa lunghezza/numero segmenti dei tile del terreno, così scorrono in sync.
-  const WALL_X = 5.5; // stesso offset dei billboard: i billboard vi si "appoggiano"
-  const WALL_HEIGHT = 6;
   const walls = [];
   for (const side of [-1, 1]) {
     for (let i = 0; i < NUM_TILES; i++) {
@@ -126,9 +135,23 @@ export async function createGameScene({ engine, canvas, goto }) {
       );
       w.material = wallMat;
       w.rotation.y = Math.PI / 2; // piano verticale, rivolto verso il centro strada
-      w.position.set(side * WALL_X, WALL_HEIGHT / 2, i * TILE_LEN);
+      w.position.set(side * CORRIDOR_HALF_WIDTH, WALL_HEIGHT / 2, i * TILE_LEN);
       walls.push(w);
     }
+  }
+
+  // ---- Soffitto del corridoio (stesso stile/materiale dei muri) ----
+  const ceilings = [];
+  for (let i = 0; i < NUM_TILES; i++) {
+    const c = MeshBuilder.CreatePlane(
+      "ceiling" + i,
+      { width: CORRIDOR_HALF_WIDTH * 2, height: TILE_LEN },
+      scene
+    );
+    c.material = wallMat;
+    c.rotation.x = Math.PI / 2; // piano orizzontale, rivolto verso il basso
+    c.position.set(0, WALL_HEIGHT, i * TILE_LEN);
+    ceilings.push(c);
   }
 
   // ---- Strisce laterali in movimento (senso di velocità) ----
@@ -142,7 +165,9 @@ export async function createGameScene({ engine, canvas, goto }) {
   // }
 
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
-  const BILLBOARD_X = 5.5; // distanza dal centro strada, oltre le strisce
+  // Leggermente più vicini al centro rispetto al muro, così restano "appoggiati"
+  // sulla sua superficie invece di essere coplanari (che causava clipping/z-fighting).
+  const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
   const BILLBOARD_Y = 1.6; // altezza da terra
   const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
   const BILLBOARD_COUNT = 8; // totale, alternati sui due lati
@@ -210,6 +235,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       ob.active = true;
       ob.lane = obsLane;
       ob.mesh.setEnabled(true);
+      ob.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
       ob.mesh.position.set(LANES[obsLane], 0.7, state.nextSpawnZ);
     }
 
@@ -224,6 +250,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         co.active = true;
         co.lane = coinLane;
         co.mesh.setEnabled(true);
+        co.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
         co.mesh.position.set(LANES[coinLane], 1.0, state.nextSpawnZ + k * 1.6);
       }
     }
@@ -342,6 +369,10 @@ export async function createGameScene({ engine, canvas, goto }) {
       w.position.z -= move;
       if (w.position.z < -TILE_LEN) w.position.z += TILE_LEN * NUM_TILES;
     }
+    for (const c of ceilings) {
+      c.position.z -= move;
+      if (c.position.z < -TILE_LEN) c.position.z += TILE_LEN * NUM_TILES;
+    }
     // for (const s of stripes) {
     //   s.position.z -= move;
     //   if (s.position.z < DESPAWN_BEHIND) s.position.z += 4 * stripes.length;
@@ -358,6 +389,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     for (const ob of obstacles) {
       if (!ob.active) continue;
       ob.mesh.position.z -= move;
+      // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
+      ob.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - ob.mesh.position.z) / FADE_DISTANCE));
       // Collisione: vicino in z, stessa corsia, player non abbastanza in alto.
       if (Math.abs(ob.mesh.position.z) < 0.9 && Math.abs(ob.mesh.position.x - px) < 1.0 && py < 1.6) {
         gameOver();
@@ -373,6 +406,8 @@ export async function createGameScene({ engine, canvas, goto }) {
       if (!co.active) continue;
       co.mesh.position.z -= move;
       co.mesh.rotation.x += dt * 6; // rotazione moneta
+      // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
+      co.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - co.mesh.position.z) / FADE_DISTANCE));
       if (Math.abs(co.mesh.position.z) < 0.9 && Math.abs(co.mesh.position.x - px) < 0.9 && Math.abs(py - 1.0) < 1.1) {
         co.active = false;
         co.mesh.setEnabled(false);
