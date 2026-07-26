@@ -134,7 +134,12 @@ export async function createGameScene({ engine, canvas, goto }) {
         scene
       );
       w.material = wallMat;
-      w.rotation.y = Math.PI / 2; // piano verticale, rivolto verso il centro strada
+      // Specchiata in base al lato: altrimenti entrambi i muri avrebbero la
+      // stessa normale "vera" (usata per l'illuminazione N·L), e quello con
+      // la normale che punta lontano dal centro risulterebbe sempre buio con
+      // point/directional light (backFaceCulling:false lo rende comunque
+      // visibile, ma non illuminato correttamente).
+      w.rotation.y = side === 1 ? Math.PI / 2 : -Math.PI / 2;
       w.position.set(side * CORRIDOR_HALF_WIDTH, WALL_HEIGHT / 2, i * TILE_LEN);
       walls.push(w);
     }
@@ -149,7 +154,12 @@ export async function createGameScene({ engine, canvas, goto }) {
       scene
     );
     c.material = wallMat;
-    c.rotation.x = Math.PI / 2; // piano orizzontale, rivolto verso il basso
+    // Segno opposto rispetto a quello "naturale": con +PI/2 la normale vera
+    // punta verso l'alto (lontano dall'interno del corridoio, dove sta la
+    // luce), risultando sempre in ombra con point/directional light nonostante
+    // sia visibile (backFaceCulling:false). Con -PI/2 punta verso il basso,
+    // verso l'interno.
+    c.rotation.x = -Math.PI / 2; // piano orizzontale, normale rivolta verso il basso
     c.position.set(0, WALL_HEIGHT, i * TILE_LEN);
     ceilings.push(c);
   }
