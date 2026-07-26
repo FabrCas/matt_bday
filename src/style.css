@@ -43,11 +43,23 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  padding: env(safe-area-inset-top) 1.5rem env(safe-area-inset-bottom);
+  padding: calc(env(safe-area-inset-top) + 1rem) 1.5rem calc(env(safe-area-inset-bottom) + 1rem);
   text-align: center;
   background: radial-gradient(circle at 50% 30%, rgba(56, 189, 248, 0.12), rgba(15, 23, 42, 0.92) 70%);
   backdrop-filter: blur(2px);
   z-index: 10;
+  /* Su schermi bassi (mobile in landscape, tastiera aperta, ecc.) il
+     contenuto può superare l'altezza della viewport: permette lo scroll
+     invece di tagliare il testo (era il bug con endgame-message lungo). */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.overlay > * {
+  max-width: min(90vw, 640px);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  flex-shrink: 0;
 }
 
 .hidden {
