@@ -66,12 +66,13 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
   const groundMat = new StandardMaterial("groundMat", scene);
-  groundMat.diffuseColor = new Color3(0.36, 0.55, 0.32);
+  groundMat.diffuseColor = new Color3(0.5, 0.5, 0.5);
   groundMat.specularColor = new Color3(0, 0, 0);
 
-  const stripeMat = new StandardMaterial("stripeMat", scene);
-  stripeMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
-  stripeMat.specularColor = new Color3(0, 0, 0);
+  // const stripeMat = new StandardMaterial("stripeMat", scene);
+  // stripeMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
+
+  // stripeMat.specularColor = new Color3(0, 0, 0);
 
   const wallMat = new StandardMaterial("wallMat", scene);
   wallMat.diffuseColor = new Color3(0.55, 0.55, 0.58);
@@ -85,7 +86,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   const coinMat = new StandardMaterial("coinMat", scene);
   coinMat.diffuseColor = new Color3(0.98, 0.75, 0.15);
   coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
-  coinMat.specularColor = new Color3(0, 0, 0);
+  coinMat.specularColor = new Color3(1, 1, 1);
   
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
