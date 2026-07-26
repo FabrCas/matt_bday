@@ -181,14 +181,32 @@ export async function createGameScene({ engine, canvas, goto }) {
   const BILLBOARD_Y = 1.6; // altezza da terra
   const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
   const BILLBOARD_COUNT = 8; // totale, alternati sui due lati
+  const BILLBOARD_WIDTH = 3;
+  const BILLBOARD_HEIGHT = 2;
   const billboardMat = new StandardMaterial("billboardMat", scene);
   billboardMat.diffuseTexture = loadTexture(scene, SIDE_SLIDING_IMAGE_1);
   billboardMat.specularColor = new Color3(0, 0, 0);
   billboardMat.backFaceCulling = false; // visibile da entrambi i lati del piano
 
+  // Cornice bianca dietro ogni cartellone (effetto "quadro incorniciato").
+  // Bianco puro e non influenzato dalle luci di scena (disableLighting),
+  // così resta uniforme indipendentemente da normali/angolo della luce.
+  const FRAME_MARGIN = 0.3; // sporgenza del bordo rispetto all'immagine
+  const FRAME_THICKNESS = 0.08;
+  const FRAME_OFFSET = FRAME_THICKNESS / 2 + 0.02; // dietro l'immagine, verso il muro
+  const billboardFrameMat = new StandardMaterial("billboardFrameMat", scene);
+  billboardFrameMat.diffuseColor = new Color3(1, 1, 1);
+  billboardFrameMat.emissiveColor = new Color3(1, 1, 1);
+  billboardFrameMat.specularColor = new Color3(0, 0, 0);
+  billboardFrameMat.disableLighting = true;
+
   const billboards = [];
   for (let i = 0; i < BILLBOARD_COUNT; i++) {
-    const b = MeshBuilder.CreatePlane("billboard" + i, { width: 3, height: 2 }, scene);
+    const b = MeshBuilder.CreatePlane(
+      "billboard" + i,
+      { width: BILLBOARD_WIDTH, height: BILLBOARD_HEIGHT },
+      scene
+    );
     b.material = billboardMat;
     const side = i % 2 === 0 ? -BILLBOARD_X : BILLBOARD_X;
     b.position.set(side, BILLBOARD_Y, i * BILLBOARD_GAP);
@@ -196,6 +214,25 @@ export async function createGameScene({ engine, canvas, goto }) {
     // cartelloni avrebbero la normale vera rivolta nella stessa direzione
     // mondiale, e quelli sul lato sinistro risulterebbero sempre in ombra.
     b.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2; // normale rivolta verso il centro strada
+
+    // Piano figlio: segue automaticamente posizione/rotazione del cartellone
+    // (compreso lo scorrimento nel loop di update), nessun codice aggiuntivo
+    // necessario. Spostata lungo l'asse Z locale (= normale del cartellone),
+    // che grazie alla rotazione già specchiata sopra punta sempre verso il
+    // muro del proprio lato per entrambi i lati.
+    const frame = MeshBuilder.CreateBox(
+      "billboardFrame" + i,
+      {
+        width: BILLBOARD_WIDTH + FRAME_MARGIN,
+        height: BILLBOARD_HEIGHT + FRAME_MARGIN,
+        depth: FRAME_THICKNESS,
+      },
+      scene
+    );
+    frame.material = billboardFrameMat;
+    frame.parent = b;
+    frame.position.set(0, 0, FRAME_OFFSET);
+
     billboards.push(b);
   }
 
