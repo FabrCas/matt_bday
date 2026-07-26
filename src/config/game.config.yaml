@@ -19,6 +19,10 @@ game:
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
   wishesMessage: "Tanti auguri! Matthew"
 
+# --- Scena Auguri ---
+wishes:
+  galleryPlaneCount: 6    # numero di piani quadrati che orbitano intorno al testo
+
 # --- Economia / vincita ---
 economy:
   currencySymbol: "€"

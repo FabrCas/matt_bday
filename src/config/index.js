@@ -17,6 +17,9 @@ const defaults = {
     coinValue: 0.5,
     maxPayout: 0,
   },
+  wishes: {
+    galleryPlaneCount: 6, // numero di piani che orbitano intorno al testo
+  },
   gameplay: {
     lanes: [-2.2, 0, 2.2],
     startSpeed: 14,
