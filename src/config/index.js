@@ -9,6 +9,8 @@ const defaults = {
   game: {
     title: "Runner",
     subtitle: "",
+    allowReplay: true,
+    wishesMessage: "",
   },
   economy: {
     currencySymbol: "€",

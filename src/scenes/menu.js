@@ -48,6 +48,7 @@ export function createMenuScene({ engine, goto }) {
         unlockAudio();
         goto("game");
       },
+      onContinue: () => goto("wishes"),
       onMenu: () => goto("menu"),
     });
     createMenuScene._bound = true;

@@ -4,6 +4,7 @@ import { onResize } from "./utils/responsive.js";
 import { createMenuScene } from "./scenes/menu.js";
 import { createGameScene } from "./scenes/game.js";
 import { createGameOverScene } from "./scenes/gameover.js";
+import { createWishesScene } from "./scenes/wishes.js";
 
 const canvas = document.getElementById("renderCanvas");
 const engine = new Engine(canvas, true, {
@@ -18,6 +19,7 @@ const factories = {
   menu: createMenuScene,
   game: createGameScene,
   gameover: createGameOverScene,
+  wishes: createWishesScene,
 };
 
 // Scena attiva: { scene, update(dt), dispose() }

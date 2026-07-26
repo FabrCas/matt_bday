@@ -7,6 +7,7 @@ const screens = {
   menu: document.getElementById("menu"),
   hud: document.getElementById("hud"),
   gameover: document.getElementById("gameover"),
+  wishes: document.getElementById("wishes"),
 };
 
 const els = {
@@ -18,6 +19,8 @@ const els = {
   goDistance: document.getElementById("go-distance"),
   menuTitle: document.getElementById("menu-title"),
   menuSubtitle: document.getElementById("menu-subtitle"),
+  btnRetry: document.getElementById("btn-retry"),
+  wishesMessage: document.getElementById("wishes-message"),
 };
 
 // Applica titolo/sottotitolo dalla config statica (una volta all'avvio).
@@ -44,11 +47,17 @@ export function updateGameOver({ coins, distance, amount, message}) {
   els.goDistance.textContent = Math.floor(distance);
   els.wonAmount.textContent = formatMoney(amount);
   els.endMessage.textContent = message;
+  els.btnRetry.classList.toggle("hidden", !CONFIG.game.allowReplay);
+}
+
+export function updateWishes() {
+  els.wishesMessage.textContent = CONFIG.game.wishesMessage;
 }
 
 // Collega i pulsanti una sola volta; ritorna gli handler da riassegnare.
-export function bindButtons({ onPlay, onRetry, onMenu }) {
+export function bindButtons({ onPlay, onRetry, onContinue, onMenu }) {
   document.getElementById("btn-play").addEventListener("click", onPlay);
   document.getElementById("btn-retry").addEventListener("click", onRetry);
-  document.getElementById("btn-menu").addEventListener("click", onMenu);
+  document.getElementById("btn-continue").addEventListener("click", onContinue);
+  document.getElementById("btn-wishes-menu").addEventListener("click", onMenu);
 }
