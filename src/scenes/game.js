@@ -44,7 +44,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // nascondendo così il riciclo dei segmenti (muri/tile/billboard) in lontananza.
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = new Color3(0.53, 0.81, 0.92);
-  scene.fogDensity = 0.02;
+  scene.fogDensity = 0.015;
 
   // ---- Camera (dietro il player, adattata al dispositivo) ----
   const cam = getCameraProfile();
