@@ -201,7 +201,20 @@ export async function createGameScene({ engine, canvas, goto }) {
     // Nota risorse (hosting statico su GitHub Pages, vedi CLAUDE.md): ogni
     // point light aggiuntiva ha un costo; LAMP_COUNT è tenuto basso perché
     // solo quelle vicine al player contribuiscono in modo visibile.
-    lamps.push({ box, light });
+
+    // Marker di debug: sfera rossa esattamente sulla posizione della luce,
+    // per verificare a video che resti sempre allineata al box giallo
+    // (utile per confermare/escludere drift box↔luce).
+    let debugMarker = null;
+    if (DEBUG) {
+      debugMarker = MeshBuilder.CreateSphere("lampLightMarker" + i, { diameter: 0.2 }, scene);
+      const debugMarkerMat = new StandardMaterial("lampLightMarkerMat" + i, scene);
+      debugMarkerMat.diffuseColor = new Color3(1, 0, 0);
+      debugMarkerMat.emissiveColor = new Color3(1, 0, 0);
+      debugMarker.material = debugMarkerMat;
+    }
+
+    lamps.push({ box, light, debugMarker });
   }
 
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
@@ -469,6 +482,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       l.light.position.x = l.box.position.x;
       l.light.position.y = l.box.position.y - LAMP_LIGHT_DROP;
       l.light.position.z = l.box.position.z;
+      if (l.debugMarker) l.debugMarker.position.copyFrom(l.light.position);
 
       // Dissolvenza vicino al bordo di riciclo: l'intensità scende a 0 prima
       // che il lampadario venga teletrasportato in avanti, così il "salto"
