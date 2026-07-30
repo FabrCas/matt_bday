@@ -242,23 +242,42 @@ export async function createGameScene({ engine, canvas, goto }) {
     lamps.push({ box, light, debugMarker });
   }
 
-  // ---- Muro di nebbia in lontananza (fondale fisso, non scorre con la pista) ----
-  // Le 4 texture sono sovrapposte alla stessa posizione (piani impilati a
-  // distanza fissa oltre il punto in cui spawnano gli oggetti), ciascuna col
-  // proprio ritmo di dissolvenza incrociata e deriva UV: il risultato è la
-  // somma delle 4 trasparenze che cambia continuamente nel tempo, dando
-  // l'effetto di nebbia che si "muove" senza mai essere un singolo piano
-  // statico. Non ha logica di scorrimento/riciclo: resta sempre alla stessa
-  // distanza dalla camera (che a sua volta non si muove mai in game.js),
-  // quindi è "all'infinito" per definizione — il giocatore non potrà mai
-  // avvicinarcisi né vederla "consumata" dal riciclo degli altri elementi.
-  const FOG_WALL_Z = SPAWN_AHEAD + 25; // ben oltre lo spawn degli ostacoli, dentro la fog di scena
-  const FOG_WALL_LAYER_GAP = 2.5; // separazione tra i layer, per un corretto ordinamento della trasparenza
-  const FOG_WALL_WIDTH = CORRIDOR_HALF_WIDTH * 8;
-  const FOG_WALL_HEIGHT = WALL_HEIGHT * 2.2;
+  // ---- Velo di nebbia all'orizzonte (attraversa la vista uno alla volta) ----
+  // Posizionato esattamente a SPAWN_AHEAD: è lo stesso punto in cui
+  // compaiono ostacoli/monete, cioè il limite di ciò che è ancora
+  // visibile prima che la fog di scena diventi troppo densa — non oltre,
+  // altrimenti il velo viaggerebbe in una zona già invisibile e l'effetto
+  // andrebbe sprecato.
+  // Non c'è scorrimento/riciclo in Z: la camera non si muove mai in
+  // game.js, quindi restare a Z fissa equivale a restare "all'infinito"
+  // rispetto al giocatore.
+  // Un solo velo attivo alla volta (una mesh, materiale riassegnato ad ogni
+  // nuovo passaggio): sceglie a caso una delle 4 texture e una direzione
+  // (sinistra→destra o il contrario), attraversa lo schermo con una
+  // dissolvenza in entrata/uscita (mai un pop ai margini), poi dopo una
+  // pausa casuale ne parte un altro — imprevedibile, non un loop meccanico.
+  const FOG_WALL_Z = SPAWN_AHEAD;
   const FOG_WALL_Y = WALL_HEIGHT * 0.55;
+  const FOG_WALL_WIDTH = 10;
+  const FOG_WALL_HEIGHT = 6;
+  const FOG_CROSS_DURATION_MIN = 9; // secondi per attraversare tutto lo schermo
+  const FOG_CROSS_DURATION_MAX = 15;
+  const FOG_EDGE_FADE = 0.15; // frazione iniziale/finale del tragitto dedicata alla dissolvenza
+  const FOG_COOLDOWN_MIN = 1.5; // pausa tra un velo e il successivo
+  const FOG_COOLDOWN_MAX = 5;
 
-  const fogLayers = FOG_TEXTURES.map((file, idx) => {
+  // Ampiezza del tragitto orizzontale = metà larghezza visibile a quella
+  // distanza (dal FOV orizzontale reale, aspect ratio incluso), con un
+  // margine di sicurezza: il velo nasce/muore appena dentro al bordo dello
+  // schermo invece che a un X arbitrario che potrebbe restare sempre
+  // fuori vista (o sempre dentro, "murando" il fondo).
+  const fogAspect = engine.getRenderWidth() / engine.getRenderHeight();
+  const fogTanHalfV = Math.tan(cam.fov / 2);
+  const fogTanHalfH = fogTanHalfV * fogAspect;
+  const fogDistanceFromCamera = FOG_WALL_Z + cam.distance;
+  const FOG_TRAVEL_HALF = fogDistanceFromCamera * fogTanHalfH * 0.92;
+
+  const fogMats = FOG_TEXTURES.map((file, idx) => {
     const mat = new StandardMaterial("fogMat" + idx, scene);
     const tex = loadTexture(scene, file);
     tex.hasAlpha = true;
@@ -268,34 +287,40 @@ export async function createGameScene({ engine, canvas, goto }) {
     mat.specularColor = new Color3(0, 0, 0);
     mat.disableLighting = true;
     mat.backFaceCulling = false;
-
-    const mesh = MeshBuilder.CreatePlane(
-      "fogWallLayer" + idx,
-      { width: FOG_WALL_WIDTH, height: FOG_WALL_HEIGHT },
-      scene
-    );
-    mesh.material = mat;
-    // Layer separati lungo Z (mai in movimento) solo per un ordinamento
-    // stabile della trasparenza; il piano di base (senza rotazione) guarda
-    // già verso la camera, che sta dal lato -Z rispetto al muro.
-    mesh.position.set(0, FOG_WALL_Y, FOG_WALL_Z + idx * FOG_WALL_LAYER_GAP);
-
-    return {
-      material: mat,
-      texture: tex,
-      // Fase/velocità diverse per layer, così le 4 dissolvenze incrociate e
-      // le derive UV non si sincronizzano mai visibilmente tra loro.
-      uSpeed: 0.015 + idx * 0.005,
-      vSpeed: 0.01 + idx * 0.004,
-      driftPhase: idx * 1.7,
-      fadeSpeed: 0.08 + idx * 0.03,
-      fadePhase: idx * 2.1,
-      // Range di opacità diverso per layer: alcuni più leggeri (velo
-      // sottile), altri più densi (nucleo della nebbia), per profondità.
-      alphaMin: 0.15 + idx * 0.05,
-      alphaMax: 0.45 + idx * 0.08,
-    };
+    return { material: mat, texture: tex, uSpeed: 0.02 + idx * 0.01, vSpeed: 0.015 + idx * 0.008 };
   });
+
+  const fogWisp = MeshBuilder.CreatePlane(
+    "fogWisp",
+    { width: FOG_WALL_WIDTH, height: FOG_WALL_HEIGHT },
+    scene
+  );
+  fogWisp.position.set(0, FOG_WALL_Y, FOG_WALL_Z);
+  fogWisp.setEnabled(false);
+
+  // Stato del velo attivo/in pausa: gestito interamente in update() (vedi
+  // spawnFogWisp / avanzamento più sotto), nessuna logica extra qui.
+  const fogState = {
+    active: false,
+    progress: 0,
+    duration: 0,
+    fromX: 0,
+    toX: 0,
+    mat: null,
+    cooldown: 1 + Math.random() * FOG_COOLDOWN_MAX,
+  };
+  function spawnFogWisp() {
+    const dir = Math.random() < 0.5 ? 1 : -1; // sinistra→destra o il contrario, a caso
+    fogState.mat = fogMats[Math.floor(Math.random() * fogMats.length)];
+    fogWisp.material = fogState.mat.material;
+    fogState.fromX = -dir * FOG_TRAVEL_HALF;
+    fogState.toX = dir * FOG_TRAVEL_HALF;
+    fogState.progress = 0;
+    fogState.duration = FOG_CROSS_DURATION_MIN + Math.random() * (FOG_CROSS_DURATION_MAX - FOG_CROSS_DURATION_MIN);
+    fogState.active = true;
+    fogWisp.position.x = fogState.fromX;
+    fogWisp.setEnabled(true);
+  }
 
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
@@ -575,25 +600,33 @@ export async function createGameScene({ engine, canvas, goto }) {
       l.light.intensity = LAMP_INTENSITY * fade;
     }
 
-    // Muro di nebbia in lontananza: nessuno scorrimento/riciclo (resta fermo,
-    // "all'infinito"), solo deriva UV e dissolvenza incrociata tra i 4 layer
-    // sovrapposti. Orologio dedicato (state.fogTime), indipendente dalla
-    // velocità di gioco, altrimenti la nebbia "correrebbe" sempre più veloce
-    // insieme all'accelerazione del corridoio.
+    // Velo di nebbia all'orizzonte: nessuno scorrimento/riciclo in Z (resta
+    // fisso a SPAWN_AHEAD, "all'infinito"), solo attraversamento orizzontale
+    // di un velo alla volta. Orologio dedicato (state.fogTime), indipendente
+    // dalla velocità di gioco, altrimenti la nebbia "correrebbe" sempre più
+    // veloce insieme all'accelerazione del corridoio.
     state.fogTime += dt;
-    for (const layer of fogLayers) {
-      // Deriva UV oscillante (non uno scroll continuo): evitando di superare
-      // mai lo stesso punto di partenza non si vede mai la giuntura del
-      // bordo della texture, che non è seamless.
-      layer.texture.uOffset = Math.sin(state.fogTime * layer.uSpeed + layer.driftPhase) * 0.1;
-      layer.texture.vOffset = Math.sin(state.fogTime * layer.vSpeed + layer.driftPhase * 1.3) * 0.06;
-
-      // Dissolvenza incrociata: ogni layer oscilla nel proprio range di
-      // opacità, sfasato rispetto agli altri 3 — la somma delle 4 trasparenze
-      // che cambiano nel tempo è quello che dà l'impressione di nebbia viva
-      // invece di una texture ferma.
-      const fade = 0.5 + 0.5 * Math.sin(state.fogTime * layer.fadeSpeed + layer.fadePhase); // 0..1
-      layer.material.alpha = layer.alphaMin + (layer.alphaMax - layer.alphaMin) * fade;
+    if (!fogState.active) {
+      fogState.cooldown -= dt;
+      if (fogState.cooldown <= 0) spawnFogWisp();
+    } else {
+      fogState.progress += dt / fogState.duration;
+      if (fogState.progress >= 1) {
+        fogState.active = false;
+        fogWisp.setEnabled(false);
+        fogState.cooldown = FOG_COOLDOWN_MIN + Math.random() * (FOG_COOLDOWN_MAX - FOG_COOLDOWN_MIN);
+      } else {
+        fogWisp.position.x = fogState.fromX + (fogState.toX - fogState.fromX) * fogState.progress;
+        // Dissolvenza in entrata/uscita: niente pop ai margini del percorso.
+        const fadeIn = Math.min(1, fogState.progress / FOG_EDGE_FADE);
+        const fadeOut = Math.min(1, (1 - fogState.progress) / FOG_EDGE_FADE);
+        fogWisp.visibility = Math.min(fadeIn, fadeOut) * 0.6;
+        // Deriva UV oscillante del materiale attivo (non uno scroll continuo,
+        // per non mostrare la giuntura di una texture non seamless).
+        const m = fogState.mat;
+        m.texture.uOffset = Math.sin(state.fogTime * m.uSpeed) * 0.1;
+        m.texture.vOffset = Math.sin(state.fogTime * m.vSpeed) * 0.06;
+      }
     }
 
     // Ostacoli e monete: scorrono verso il player.
