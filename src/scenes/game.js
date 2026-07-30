@@ -37,12 +37,30 @@ const DESPAWN_BEHIND = -12; // dietro la camera -> riciclo/rimozione (interno)
 const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
 const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete allo spawn
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
+const WALL_HEIGHT = 10;
+// ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
+// Placeholder: in seguito il box verrà sostituito da un modello importato.
+// Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
+// in modo che si sposti in sincrono (la posizione della luce viene
+// aggiornata a mano in update(), i Light di Babylon non seguono in modo
+// affidabile un parent come i mesh).
+const LAMP_GAP = 30; // distanza tra un lampadario e il successivo
+const LAMP_COUNT = 3; // numero di lampadari attivi contemporaneamente
+const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
+const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
+const LAMP_BOX_SIZE = 0.8;
+const LAMP_INTENSITY = 0.6;
+// Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
+// sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
+// veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
+// in modo visibile, dando l'effetto di "spegnimento di colpo".
+const LAMP_FADE_DISTANCE = 6;
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
 const TILE_LEN = 30;
 const NUM_TILES = 4;
 const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
-const WALL_HEIGHT = 10;
+
 export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.53, 0.81, 0.92, 1); // cielo azzurro
@@ -162,23 +180,6 @@ export async function createGameScene({ engine, canvas, goto }) {
     ceilings.push(c);
   }
 
-  // ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
-  // Placeholder: in seguito il box verrà sostituito da un modello importato.
-  // Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
-  // in modo che si sposti in sincrono (la posizione della luce viene
-  // aggiornata a mano in update(), i Light di Babylon non seguono in modo
-  // affidabile un parent come i mesh).
-  const LAMP_GAP = 18; // distanza tra un lampadario e il successivo
-  const LAMP_COUNT = 5; // numero di lampadari attivi contemporaneamente
-  const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
-  const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
-  const LAMP_BOX_SIZE = 0.8;
-  const LAMP_INTENSITY = 0.6;
-  // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
-  // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
-  // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
-  // in modo visibile, dando l'effetto di "spegnimento di colpo".
-  const LAMP_FADE_DISTANCE = 6;
 
   const lampMat = new StandardMaterial("lampMat", scene);
   lampMat.diffuseColor = new Color3(0.95, 0.85, 0.2);
