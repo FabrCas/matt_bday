@@ -5,6 +5,7 @@ import {
   DirectionalLight,
   PointLight,
   MeshBuilder,
+  Mesh,
   StandardMaterial,
   Color3,
   Color4,
@@ -22,6 +23,10 @@ const PLAYER_MODEL = "test.glb";
 
 // Immagine dei cartelloni ai lati della strada: static/assets/imgs/billboard.png
 const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
+
+// Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
+// di nebbia con movimento organico invece di una singola texture statica.
+const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "fog_3.png"];
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
@@ -44,6 +49,14 @@ const WALL_HEIGHT = 10;
 // in modo che si sposti in sincrono (la posizione della luce viene
 // aggiornata a mano in update(), i Light di Babylon non seguono in modo
 // affidabile un parent come i mesh).
+<<<<<<< Updated upstream
+=======
+// LAMP_GAP*LAMP_COUNT determina anche dove "rientra" un lampadario riciclato
+// (vedi update()): con 30 il punto più vicino di rientro era ~78 unità, ben
+// dentro il raggio ancora visibile della fog attuale (causava un pop-in
+// visibile). Con 40 rientra a ~108, oltre il punto in cui densityFog lo
+// nasconde già quasi del tutto.
+>>>>>>> Stashed changes
 const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
 const LAMP_COUNT = 3; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
@@ -73,10 +86,14 @@ export async function createGameScene({ engine, canvas, goto }) {
   scene.clearColor = new Color4(0.53, 0.81, 0.92, 1); // cielo azzurro
 
   // Fog per dissolvere il fondo del corridoio infinito nella foschia del cielo,
-  // nascondendo così il riciclo dei segmenti (muri/tile/billboard) in lontananza.
+  // nascondendo così il riciclo dei segmenti (muri/tile/billboard/lampadari)
+  // in lontananza. Tarata perché sia quasi completamente opaca (~2-4% di
+  // visibilità) entro le distanze a cui questi oggetti vengono riciclati/
+  // ricompaiono (~90-110 unità): con la densità precedente (0.015) a quelle
+  // distanze restava ~25-30% visibile, e il pop-in si vedeva chiaramente.
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = new Color3(0.53, 0.81, 0.92);
-  scene.fogDensity = 0.015;
+  scene.fogDensity = 0.02;
 
   // ---- Camera (dietro il player, adattata al dispositivo) ----
   const cam = getCameraProfile();
@@ -229,6 +246,76 @@ export async function createGameScene({ engine, canvas, goto }) {
     lamps.push({ box, light, debugMarker });
   }
 
+  // ---- Banchi di nebbia (piani con le 4 texture, riciclati come i lampadari) ----
+  // Ogni piano è un billboard verticale (resta sempre "dritto" e rivolto
+  // verso la camera mentre scorre) con una delle 4 texture di nebbia.
+  // Nota: sotto billboardMode una rotazione manuale della mesh (es.
+  // rotation.z) verrebbe sovrascritta dal calcolo che orienta il piano verso
+  // la camera, quindi il movimento "vivo" non passa dalla rotazione della
+  // mesh ma da tre componenti indipendenti e sfasate per piano/materiale:
+  //  - oscillazione laterale (sway) della posizione lungo X
+  //  - deriva lenta delle coordinate UV della texture (uOffset/vOffset,
+  //    oscillante avanti/indietro per evitare la giuntura visibile che si
+  //    avrebbe scorrendo sempre nella stessa direzione con una texture non
+  //    seamless)
+  //  - "respiro" di opacità (via visibility, non material.alpha: così resta
+  //    indipendente per singolo piano anche condividendo il materiale)
+  // Materiali condivisi per texture (4 in totale, non uno per piano).
+  const FOG_PUFF_COUNT = 8;
+  const FOG_GAP = 16; // distanza media lungo Z tra un banco e il successivo
+  const FOG_Y = WALL_HEIGHT * 0.55;
+  const FOG_WIDTH = 9;
+  const FOG_HEIGHT = 5;
+  const FOG_FADE_DISTANCE = 8; // sfuma prima del riciclo, stesso schema dei lampadari
+
+  const fogMats = FOG_TEXTURES.map((file, idx) => {
+    const mat = new StandardMaterial("fogMat" + idx, scene);
+    const tex = loadTexture(scene, file);
+    tex.hasAlpha = true;
+    mat.diffuseTexture = tex;
+    mat.useAlphaFromDiffuseTexture = true;
+    mat.emissiveColor = new Color3(0.85, 0.9, 0.95); // tinta verso il colore della fog di scena
+    mat.specularColor = new Color3(0, 0, 0);
+    mat.disableLighting = true;
+    mat.backFaceCulling = false;
+    mat.alpha = 0.55; // translucenza di base, oltre all'alpha della texture
+    return {
+      material: mat,
+      texture: tex,
+      // Fase/velocità diverse per materiale, così i 4 banchi di nebbia non
+      // "respirano"/derivano mai in sincronia visibile tra loro.
+      uSpeed: 0.02 + idx * 0.006,
+      vSpeed: 0.012 + idx * 0.004,
+      phase: idx * 1.7,
+    };
+  });
+
+  const fogPuffs = [];
+  for (let i = 0; i < FOG_PUFF_COUNT; i++) {
+    const scale = 0.8 + Math.random() * 0.6;
+    const p = MeshBuilder.CreatePlane(
+      "fogPuff" + i,
+      { width: FOG_WIDTH * scale, height: FOG_HEIGHT * scale },
+      scene
+    );
+    p.material = fogMats[i % fogMats.length].material;
+    p.billboardMode = Mesh.BILLBOARDMODE_Y; // resta verticale, ruota solo intorno a Y verso la camera
+
+    const baseX = (Math.random() * 2 - 1) * CORRIDOR_HALF_WIDTH * 1.3;
+    const baseY = FOG_Y + (Math.random() - 0.5) * 2;
+    p.position.set(baseX, baseY, i * FOG_GAP);
+
+    fogPuffs.push({
+      mesh: p,
+      baseX,
+      swayAmount: 0.6 + Math.random() * 0.9,
+      swaySpeed: 0.15 + Math.random() * 0.15,
+      swayPhase: Math.random() * Math.PI * 2,
+      breathePhase: Math.random() * Math.PI * 2,
+      breatheSpeed: 0.2 + Math.random() * 0.2,
+    });
+  }
+
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
   const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
@@ -330,6 +417,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     velY: 0,
     grounded: true,
     nextSpawnZ: SPAWN_AHEAD,
+    fogTime: 0, // orologio indipendente dalla velocità, per il moto dei banchi di nebbia
   };
 
   function spawnRow() {
@@ -504,6 +592,31 @@ export async function createGameScene({ engine, canvas, goto }) {
       const distFromRecycle = l.box.position.z - DESPAWN_BEHIND;
       const fade = Math.min(1, Math.max(0, distFromRecycle / LAMP_FADE_DISTANCE));
       l.light.intensity = LAMP_INTENSITY * fade;
+    }
+
+    // Banchi di nebbia: scorrono come il resto della scena, più un moto
+    // organico (sway laterale, rotazione lenta, "respiro" di opacità)
+    // indipendente dalla velocità di gioco — usa un orologio dedicato
+    // (state.fogTime) invece di dt*move, altrimenti la nebbia "corre"
+    // sempre più veloce insieme all'accelerazione del corridoio.
+    state.fogTime += dt;
+    // Deriva UV per materiale (oscillante, non uno scroll continuo: evitando
+    // di superare mai lo stesso punto di partenza non si vede mai la
+    // giuntura del bordo della texture, che non è seamless).
+    for (const fm of fogMats) {
+      fm.texture.uOffset = Math.sin(state.fogTime * fm.uSpeed + fm.phase) * 0.08;
+      fm.texture.vOffset = Math.sin(state.fogTime * fm.vSpeed + fm.phase * 1.3) * 0.05;
+    }
+    for (const f of fogPuffs) {
+      f.mesh.position.z -= move;
+      if (f.mesh.position.z < DESPAWN_BEHIND) f.mesh.position.z += FOG_GAP * FOG_PUFF_COUNT;
+
+      f.mesh.position.x = f.baseX + Math.sin(state.fogTime * f.swaySpeed + f.swayPhase) * f.swayAmount;
+
+      const breathe = 0.5 + 0.5 * Math.sin(state.fogTime * f.breatheSpeed + f.breathePhase); // 0..1
+      const puffDistFromRecycle = f.mesh.position.z - DESPAWN_BEHIND;
+      const puffRecycleFade = Math.min(1, Math.max(0, puffDistFromRecycle / FOG_FADE_DISTANCE));
+      f.mesh.visibility = (0.35 + 0.5 * breathe) * puffRecycleFade;
     }
 
     // Ostacoli e monete: scorrono verso il player.
