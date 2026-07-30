@@ -67,12 +67,12 @@ const WALL_HEIGHT = 10;
 // dentro il raggio ancora visibile della fog attuale (causava un pop-in
 // visibile). Con 40 rientra a ~108, oltre il punto in cui densityFog lo
 // nasconde già quasi del tutto.
-const LAMP_GAP = 65; // distanza tra un lampadario e il successivo
-const LAMP_COUNT = 2; // numero di lampadari attivi contemporaneamente
+const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
+const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
 const LAMP_BOX_SIZE = 0.8;
-const LAMP_INTENSITY = 0.6;
+const LAMP_INTENSITY = 1;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
@@ -85,6 +85,30 @@ const LAMP_FADE_DISTANCE = LAMP_GAP/2;
 // "alcune luci non si accendano" anche se esistono e sono posizionate bene.
 // Va impostato esplicitamente su ogni materiale illuminato dai lampadari.
 const MAX_LIGHTS = LAMP_COUNT + 1; // + hemi
+// ---- Velo di nebbia all'orizzonte (attraversa la vista uno alla volta) ----
+// Posizionato esattamente a SPAWN_AHEAD: è lo stesso punto in cui
+// compaiono ostacoli/monete, cioè il limite di ciò che è ancora
+// visibile prima che la fog di scena diventi troppo densa — non oltre,
+// altrimenti il velo viaggerebbe in una zona già invisibile e l'effetto
+// andrebbe sprecato.
+// Non c'è scorrimento/riciclo in Z: la camera non si muove mai in
+// game.js, quindi restare a Z fissa equivale a restare "all'infinito"
+// rispetto al giocatore.
+// Un solo velo attivo alla volta (una mesh, materiale riassegnato ad ogni
+// nuovo passaggio): sceglie a caso una delle 4 texture e una direzione
+// (sinistra→destra o il contrario), attraversa lo schermo con una
+// dissolvenza in entrata/uscita (mai un pop ai margini), poi dopo una
+// pausa casuale ne parte un altro — imprevedibile, non un loop meccanico.
+const FOG_WALL_Z = SPAWN_AHEAD - 5;
+const FOG_WALL_Y = WALL_HEIGHT * 0.55;
+const FOG_WALL_WIDTH = 10;
+const FOG_WALL_HEIGHT = 10;
+const FOG_CROSS_DURATION_MIN = 9; // secondi per attraversare tutto lo schermo
+const FOG_CROSS_DURATION_MAX = 15;
+const FOG_EDGE_FADE = 0.15; // frazione iniziale/finale del tragitto dedicata alla dissolvenza
+const FOG_COOLDOWN_MIN = 1.5; // pausa tra un velo e il successivo
+const FOG_COOLDOWN_MAX = 4;
+
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
 const TILE_LEN = 30;
@@ -103,7 +127,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // distanze restava ~25-30% visibile, e il pop-in si vedeva chiaramente.
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = new Color3(0.53, 0.81, 0.92);
-  scene.fogDensity = 0.015;
+  scene.fogDensity = 0.0005;
 
   // ---- Camera (dietro il player, adattata al dispositivo) ----
   const cam = getCameraProfile();
@@ -113,8 +137,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   // ---- Luci (leggere: hemispheric di riempimento, niente ombre) ----
   // Le point light "vere" sono quelle dei lampadari più sotto, riciclate
   // lungo il corridoio insieme al resto della scena.
-  const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), scene);
-  hemi.intensity = 0.2;
+  // const hemi = new HemisphericLight("hemi", new Vector3(0, 0, 1), scene);
+  // hemi.intensity = 0.01;
+  const direct = new DirectionalLight("directional", new Vector3(0,-1,0), scene);
+  direct.intensity = 0.4; 
+
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
   // Pavimento/muri (e soffitto, che riusa wallMat) in PBR con il set di
@@ -269,7 +296,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     // sempre derivata da esso, non c'è uno stato separato che possa
     // disallinearsi).
     const light = new PointLight("lampLight" + i, Vector3.Zero(), scene);
-    light.diffuse = new Color3(1, 0.95, 0.8);
+    light.diffuse = new Color3(1, 1, 1);
     light.intensity = LAMP_INTENSITY;
     // Nota risorse (hosting statico su GitHub Pages, vedi CLAUDE.md): ogni
     // point light aggiuntiva ha un costo; LAMP_COUNT è tenuto basso perché
@@ -290,29 +317,6 @@ export async function createGameScene({ engine, canvas, goto }) {
     lamps.push({ box, light, debugMarker });
   }
 
-  // ---- Velo di nebbia all'orizzonte (attraversa la vista uno alla volta) ----
-  // Posizionato esattamente a SPAWN_AHEAD: è lo stesso punto in cui
-  // compaiono ostacoli/monete, cioè il limite di ciò che è ancora
-  // visibile prima che la fog di scena diventi troppo densa — non oltre,
-  // altrimenti il velo viaggerebbe in una zona già invisibile e l'effetto
-  // andrebbe sprecato.
-  // Non c'è scorrimento/riciclo in Z: la camera non si muove mai in
-  // game.js, quindi restare a Z fissa equivale a restare "all'infinito"
-  // rispetto al giocatore.
-  // Un solo velo attivo alla volta (una mesh, materiale riassegnato ad ogni
-  // nuovo passaggio): sceglie a caso una delle 4 texture e una direzione
-  // (sinistra→destra o il contrario), attraversa lo schermo con una
-  // dissolvenza in entrata/uscita (mai un pop ai margini), poi dopo una
-  // pausa casuale ne parte un altro — imprevedibile, non un loop meccanico.
-  const FOG_WALL_Z = SPAWN_AHEAD - 30;
-  const FOG_WALL_Y = WALL_HEIGHT * 0.55;
-  const FOG_WALL_WIDTH = 10;
-  const FOG_WALL_HEIGHT = 6;
-  const FOG_CROSS_DURATION_MIN = 9; // secondi per attraversare tutto lo schermo
-  const FOG_CROSS_DURATION_MAX = 15;
-  const FOG_EDGE_FADE = 0.15; // frazione iniziale/finale del tragitto dedicata alla dissolvenza
-  const FOG_COOLDOWN_MIN = 1.5; // pausa tra un velo e il successivo
-  const FOG_COOLDOWN_MAX = 5;
 
   // Ampiezza del tragitto orizzontale = metà larghezza visibile a quella
   // distanza (dal FOV orizzontale reale, aspect ratio incluso), con un
