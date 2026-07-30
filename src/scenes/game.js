@@ -44,17 +44,17 @@ const WALL_HEIGHT = 10;
 // in modo che si sposti in sincrono (la posizione della luce viene
 // aggiornata a mano in update(), i Light di Babylon non seguono in modo
 // affidabile un parent come i mesh).
-const LAMP_GAP = 30; // distanza tra un lampadario e il successivo
+const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
 const LAMP_COUNT = 3; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
 const LAMP_BOX_SIZE = 0.8;
-const LAMP_INTENSITY = 0.6;
+const LAMP_INTENSITY = 0.8;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
 // in modo visibile, dando l'effetto di "spegnimento di colpo".
-const LAMP_FADE_DISTANCE = 6;
+const LAMP_FADE_DISTANCE = LAMP_GAP;
 // StandardMaterial limita di default a 4 le luci che possono illuminare
 // contemporaneamente una mesh (`maxSimultaneousLights`). Con hemi + N point
 // light dei lampadari si supera facilmente quel budget, e Babylon ne scarta
@@ -65,7 +65,7 @@ const MAX_LIGHTS = LAMP_COUNT + 1; // + hemi
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
 const TILE_LEN = 30;
-const NUM_TILES = 4;
+const NUM_TILES = 6;
 const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
 
 export async function createGameScene({ engine, canvas, goto }) {
