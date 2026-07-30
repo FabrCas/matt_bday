@@ -49,14 +49,11 @@ const WALL_HEIGHT = 10;
 // in modo che si sposti in sincrono (la posizione della luce viene
 // aggiornata a mano in update(), i Light di Babylon non seguono in modo
 // affidabile un parent come i mesh).
-<<<<<<< Updated upstream
-=======
 // LAMP_GAP*LAMP_COUNT determina anche dove "rientra" un lampadario riciclato
 // (vedi update()): con 30 il punto più vicino di rientro era ~78 unità, ben
 // dentro il raggio ancora visibile della fog attuale (causava un pop-in
 // visibile). Con 40 rientra a ~108, oltre il punto in cui densityFog lo
 // nasconde già quasi del tutto.
->>>>>>> Stashed changes
 const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
 const LAMP_COUNT = 3; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
