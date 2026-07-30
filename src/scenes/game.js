@@ -99,7 +99,10 @@ const MAX_LIGHTS = LAMP_COUNT + 1; // + hemi
 // (sinistra→destra o il contrario), attraversa lo schermo con una
 // dissolvenza in entrata/uscita (mai un pop ai margini), poi dopo una
 // pausa casuale ne parte un altro — imprevedibile, non un loop meccanico.
-const FOG_WALL_Z = SPAWN_AHEAD - 5;
+// Dentro la zona di fog localizzata (SPAWN_AHEAD → +FOG_LINEAR_RANGE, vedi
+// createGameScene), non prima: il velo deve attraversare mentre la nebbia
+// è già presente, non nella zona nitida davanti al giocatore.
+const FOG_WALL_Z = SPAWN_AHEAD + 12;
 const FOG_WALL_Y = WALL_HEIGHT * 0.55;
 const FOG_WALL_WIDTH = 10;
 const FOG_WALL_HEIGHT = 10;
@@ -117,17 +120,19 @@ const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
 
 export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
-  scene.clearColor = new Color4(0.53, 0.81, 0.92, 1); // cielo azzurro
+  scene.clearColor = new Color4(0, 0, 0, 1); // sfondo nero: il vuoto oltre la fog
 
-  // Fog per dissolvere il fondo del corridoio infinito nella foschia del cielo,
-  // nascondendo così il riciclo dei segmenti (muri/tile/billboard/lampadari)
-  // in lontananza. Tarata perché sia quasi completamente opaca (~2-4% di
-  // visibilità) entro le distanze a cui questi oggetti vengono riciclati/
-  // ricompaiono (~90-110 unità): con la densità precedente (0.015) a quelle
-  // distanze restava ~25-30% visibile, e il pop-in si vedeva chiaramente.
-  scene.fogMode = Scene.FOGMODE_EXP2;
-  scene.fogColor = new Color3(0.53, 0.81, 0.92);
-  scene.fogDensity = 0.0005;
+  // Fog LINEARE localizzata: nessuna foschia prima di SPAWN_AHEAD (tutto ciò
+  // che è "in gioco" — pavimento/muri vicini, ostacoli, monete — resta
+  // nitido), poi sfuma a piena opacità nera entro FOG_LINEAR_RANGE unità.
+  // Copre così anche le distanze a cui muri/billboard/lampadari vengono
+  // riciclati (~90-110), nascondendone il pop-in, e si fonde con lo sfondo
+  // nero (fogColor = clearColor) invece di lasciare un "muro" visibile.
+  const FOG_LINEAR_RANGE = 40;
+  scene.fogMode = Scene.FOGMODE_LINEAR;
+  scene.fogColor = new Color3(0, 0, 0);
+  scene.fogStart = SPAWN_AHEAD;
+  scene.fogEnd = SPAWN_AHEAD + FOG_LINEAR_RANGE;
 
   // ---- Camera (dietro il player, adattata al dispositivo) ----
   const cam = getCameraProfile();
@@ -335,7 +340,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     tex.hasAlpha = true;
     mat.diffuseTexture = tex;
     mat.useAlphaFromDiffuseTexture = true;
-    mat.emissiveColor = new Color3(0.85, 0.9, 0.95); // tinta verso il colore della fog di scena
+    mat.emissiveColor = new Color3(0.5, 0.5, 0.52); // grigio neutro: leggibile contro lo sfondo nero
     mat.specularColor = new Color3(0, 0, 0);
     mat.disableLighting = true;
     mat.backFaceCulling = false;
