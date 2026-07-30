@@ -5,7 +5,6 @@ import {
   DirectionalLight,
   PointLight,
   MeshBuilder,
-  Mesh,
   StandardMaterial,
   Color3,
   Color4,
@@ -243,29 +242,23 @@ export async function createGameScene({ engine, canvas, goto }) {
     lamps.push({ box, light, debugMarker });
   }
 
-  // ---- Banchi di nebbia (piani con le 4 texture, riciclati come i lampadari) ----
-  // Ogni piano è un billboard verticale (resta sempre "dritto" e rivolto
-  // verso la camera mentre scorre) con una delle 4 texture di nebbia.
-  // Nota: sotto billboardMode una rotazione manuale della mesh (es.
-  // rotation.z) verrebbe sovrascritta dal calcolo che orienta il piano verso
-  // la camera, quindi il movimento "vivo" non passa dalla rotazione della
-  // mesh ma da tre componenti indipendenti e sfasate per piano/materiale:
-  //  - oscillazione laterale (sway) della posizione lungo X
-  //  - deriva lenta delle coordinate UV della texture (uOffset/vOffset,
-  //    oscillante avanti/indietro per evitare la giuntura visibile che si
-  //    avrebbe scorrendo sempre nella stessa direzione con una texture non
-  //    seamless)
-  //  - "respiro" di opacità (via visibility, non material.alpha: così resta
-  //    indipendente per singolo piano anche condividendo il materiale)
-  // Materiali condivisi per texture (4 in totale, non uno per piano).
-  const FOG_PUFF_COUNT = 8;
-  const FOG_GAP = 16; // distanza media lungo Z tra un banco e il successivo
-  const FOG_Y = WALL_HEIGHT * 0.55;
-  const FOG_WIDTH = 9;
-  const FOG_HEIGHT = 5;
-  const FOG_FADE_DISTANCE = 8; // sfuma prima del riciclo, stesso schema dei lampadari
+  // ---- Muro di nebbia in lontananza (fondale fisso, non scorre con la pista) ----
+  // Le 4 texture sono sovrapposte alla stessa posizione (piani impilati a
+  // distanza fissa oltre il punto in cui spawnano gli oggetti), ciascuna col
+  // proprio ritmo di dissolvenza incrociata e deriva UV: il risultato è la
+  // somma delle 4 trasparenze che cambia continuamente nel tempo, dando
+  // l'effetto di nebbia che si "muove" senza mai essere un singolo piano
+  // statico. Non ha logica di scorrimento/riciclo: resta sempre alla stessa
+  // distanza dalla camera (che a sua volta non si muove mai in game.js),
+  // quindi è "all'infinito" per definizione — il giocatore non potrà mai
+  // avvicinarcisi né vederla "consumata" dal riciclo degli altri elementi.
+  const FOG_WALL_Z = SPAWN_AHEAD + 25; // ben oltre lo spawn degli ostacoli, dentro la fog di scena
+  const FOG_WALL_LAYER_GAP = 2.5; // separazione tra i layer, per un corretto ordinamento della trasparenza
+  const FOG_WALL_WIDTH = CORRIDOR_HALF_WIDTH * 8;
+  const FOG_WALL_HEIGHT = WALL_HEIGHT * 2.2;
+  const FOG_WALL_Y = WALL_HEIGHT * 0.55;
 
-  const fogMats = FOG_TEXTURES.map((file, idx) => {
+  const fogLayers = FOG_TEXTURES.map((file, idx) => {
     const mat = new StandardMaterial("fogMat" + idx, scene);
     const tex = loadTexture(scene, file);
     tex.hasAlpha = true;
@@ -275,43 +268,34 @@ export async function createGameScene({ engine, canvas, goto }) {
     mat.specularColor = new Color3(0, 0, 0);
     mat.disableLighting = true;
     mat.backFaceCulling = false;
-    mat.alpha = 0.55; // translucenza di base, oltre all'alpha della texture
+
+    const mesh = MeshBuilder.CreatePlane(
+      "fogWallLayer" + idx,
+      { width: FOG_WALL_WIDTH, height: FOG_WALL_HEIGHT },
+      scene
+    );
+    mesh.material = mat;
+    // Layer separati lungo Z (mai in movimento) solo per un ordinamento
+    // stabile della trasparenza; il piano di base (senza rotazione) guarda
+    // già verso la camera, che sta dal lato -Z rispetto al muro.
+    mesh.position.set(0, FOG_WALL_Y, FOG_WALL_Z + idx * FOG_WALL_LAYER_GAP);
+
     return {
       material: mat,
       texture: tex,
-      // Fase/velocità diverse per materiale, così i 4 banchi di nebbia non
-      // "respirano"/derivano mai in sincronia visibile tra loro.
-      uSpeed: 0.02 + idx * 0.006,
-      vSpeed: 0.012 + idx * 0.004,
-      phase: idx * 1.7,
+      // Fase/velocità diverse per layer, così le 4 dissolvenze incrociate e
+      // le derive UV non si sincronizzano mai visibilmente tra loro.
+      uSpeed: 0.015 + idx * 0.005,
+      vSpeed: 0.01 + idx * 0.004,
+      driftPhase: idx * 1.7,
+      fadeSpeed: 0.08 + idx * 0.03,
+      fadePhase: idx * 2.1,
+      // Range di opacità diverso per layer: alcuni più leggeri (velo
+      // sottile), altri più densi (nucleo della nebbia), per profondità.
+      alphaMin: 0.15 + idx * 0.05,
+      alphaMax: 0.45 + idx * 0.08,
     };
   });
-
-  const fogPuffs = [];
-  for (let i = 0; i < FOG_PUFF_COUNT; i++) {
-    const scale = 0.8 + Math.random() * 0.6;
-    const p = MeshBuilder.CreatePlane(
-      "fogPuff" + i,
-      { width: FOG_WIDTH * scale, height: FOG_HEIGHT * scale },
-      scene
-    );
-    p.material = fogMats[i % fogMats.length].material;
-    p.billboardMode = Mesh.BILLBOARDMODE_Y; // resta verticale, ruota solo intorno a Y verso la camera
-
-    const baseX = (Math.random() * 2 - 1) * CORRIDOR_HALF_WIDTH * 1.3;
-    const baseY = FOG_Y + (Math.random() - 0.5) * 2;
-    p.position.set(baseX, baseY, i * FOG_GAP);
-
-    fogPuffs.push({
-      mesh: p,
-      baseX,
-      swayAmount: 0.6 + Math.random() * 0.9,
-      swaySpeed: 0.15 + Math.random() * 0.15,
-      swayPhase: Math.random() * Math.PI * 2,
-      breathePhase: Math.random() * Math.PI * 2,
-      breatheSpeed: 0.2 + Math.random() * 0.2,
-    });
-  }
 
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
@@ -591,29 +575,25 @@ export async function createGameScene({ engine, canvas, goto }) {
       l.light.intensity = LAMP_INTENSITY * fade;
     }
 
-    // Banchi di nebbia: scorrono come il resto della scena, più un moto
-    // organico (sway laterale, rotazione lenta, "respiro" di opacità)
-    // indipendente dalla velocità di gioco — usa un orologio dedicato
-    // (state.fogTime) invece di dt*move, altrimenti la nebbia "corre"
-    // sempre più veloce insieme all'accelerazione del corridoio.
+    // Muro di nebbia in lontananza: nessuno scorrimento/riciclo (resta fermo,
+    // "all'infinito"), solo deriva UV e dissolvenza incrociata tra i 4 layer
+    // sovrapposti. Orologio dedicato (state.fogTime), indipendente dalla
+    // velocità di gioco, altrimenti la nebbia "correrebbe" sempre più veloce
+    // insieme all'accelerazione del corridoio.
     state.fogTime += dt;
-    // Deriva UV per materiale (oscillante, non uno scroll continuo: evitando
-    // di superare mai lo stesso punto di partenza non si vede mai la
-    // giuntura del bordo della texture, che non è seamless).
-    for (const fm of fogMats) {
-      fm.texture.uOffset = Math.sin(state.fogTime * fm.uSpeed + fm.phase) * 0.08;
-      fm.texture.vOffset = Math.sin(state.fogTime * fm.vSpeed + fm.phase * 1.3) * 0.05;
-    }
-    for (const f of fogPuffs) {
-      f.mesh.position.z -= move;
-      if (f.mesh.position.z < DESPAWN_BEHIND) f.mesh.position.z += FOG_GAP * FOG_PUFF_COUNT;
+    for (const layer of fogLayers) {
+      // Deriva UV oscillante (non uno scroll continuo): evitando di superare
+      // mai lo stesso punto di partenza non si vede mai la giuntura del
+      // bordo della texture, che non è seamless.
+      layer.texture.uOffset = Math.sin(state.fogTime * layer.uSpeed + layer.driftPhase) * 0.1;
+      layer.texture.vOffset = Math.sin(state.fogTime * layer.vSpeed + layer.driftPhase * 1.3) * 0.06;
 
-      f.mesh.position.x = f.baseX + Math.sin(state.fogTime * f.swaySpeed + f.swayPhase) * f.swayAmount;
-
-      const breathe = 0.5 + 0.5 * Math.sin(state.fogTime * f.breatheSpeed + f.breathePhase); // 0..1
-      const puffDistFromRecycle = f.mesh.position.z - DESPAWN_BEHIND;
-      const puffRecycleFade = Math.min(1, Math.max(0, puffDistFromRecycle / FOG_FADE_DISTANCE));
-      f.mesh.visibility = (0.35 + 0.5 * breathe) * puffRecycleFade;
+      // Dissolvenza incrociata: ogni layer oscilla nel proprio range di
+      // opacità, sfasato rispetto agli altri 3 — la somma delle 4 trasparenze
+      // che cambiano nel tempo è quello che dà l'impressione di nebbia viva
+      // invece di una texture ferma.
+      const fade = 0.5 + 0.5 * Math.sin(state.fogTime * layer.fadeSpeed + layer.fadePhase); // 0..1
+      layer.material.alpha = layer.alphaMin + (layer.alphaMax - layer.alphaMin) * fade;
     }
 
     // Ostacoli e monete: scorrono verso il player.
