@@ -25,7 +25,7 @@ const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
 
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
-const FOG_TEXTURES = ["fog_0.png", "face_0.png"];
+const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png"];
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
