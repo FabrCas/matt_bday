@@ -6,6 +6,7 @@ import {
   PointLight,
   MeshBuilder,
   StandardMaterial,
+  PBRMaterial,
   Color3,
   Color4,
   Vector3,
@@ -26,6 +27,19 @@ const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
 const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png"];
+
+// Set di texture PBR per pavimento/muri (static/assets/imgs/tiles/).
+// "_gl" per la normal map: è la convenzione OpenGL (canale G verso l'alto),
+// quella che Babylon/WebGL si aspetta di default — "_dx" (DirectX, G invertito)
+// darebbe un bump map illuminato al contrario.
+const TILE_BASECOLOR = "tiles/ground_tiles_03_basecolor_1k.png";
+const TILE_NORMAL = "tiles/ground_tiles_03_normal_gl_1k.png";
+const TILE_AO = "tiles/ground_tiles_03_ambient_occlusion_1k.png";
+const TILE_ROUGHNESS = "tiles/ground_tiles_03_roughness_1k.png";
+// La height map non è usata: richiederebbe parallax occlusion mapping
+// (Babylon la legge dal canale alpha della normal map, che andrebbe
+// ricomposta a runtime unendo le due immagini) per un costo GPU per-pixel
+// non giustificato su hosting statico/mobile-first (vedi CLAUDE.md).
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
@@ -103,16 +117,50 @@ export async function createGameScene({ engine, canvas, goto }) {
   hemi.intensity = 0.2;
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
-  const groundMat = new StandardMaterial("groundMat", scene);
-  groundMat.diffuseColor = new Color3(0.5, 0.5, 0.5);
-  groundMat.specularColor = new Color3(0, 0, 0);
-  groundMat.maxSimultaneousLights = MAX_LIGHTS;
+  // Pavimento/muri (e soffitto, che riusa wallMat) in PBR con il set di
+  // texture in static/assets/imgs/tiles/. `makeTiledPbrMaterial` carica le
+  // 4 mappe e imposta la ripetizione UV in base alla dimensione reale della
+  // superficie, così la texture non risulta stirata su pavimento/muri che
+  // hanno proporzioni molto diverse tra loro.
+  function makeTiledPbrMaterial(name, repeatU, repeatV) {
+    const mat = new PBRMaterial(name, scene);
+    const albedo = loadTexture(scene, TILE_BASECOLOR);
+    const normal = loadTexture(scene, TILE_NORMAL);
+    const ao = loadTexture(scene, TILE_AO);
+    const roughness = loadTexture(scene, TILE_ROUGHNESS);
+    for (const tex of [albedo, normal, ao, roughness]) {
+      tex.uScale = repeatU;
+      tex.vScale = repeatV;
+    }
 
-  const wallMat = new StandardMaterial("wallMat", scene);
-  wallMat.diffuseColor = new Color3(0.55, 0.55, 0.58);
-  wallMat.specularColor = new Color3(0, 0, 0);
+    mat.albedoTexture = albedo;
+    mat.bumpTexture = normal;
+    mat.ambientTexture = ao; // occlusione ambientale, indipendente dal canale usato sotto per la roughness
+
+    // Niente texture metallica separata: queste superfici non sono
+    // metalliche (metallic fisso a 0). Riusiamo lo slot `metallicTexture`
+    // solo per leggere la roughness dal canale verde (un PNG in scala di
+    // grigi ha R=G=B, quindi va bene qualunque canale) — l'alpha, letta di
+    // default, sarebbe piatta/inutile su questi file.
+    mat.metallic = 0;
+    mat.metallicTexture = roughness;
+    mat.useRoughnessFromMetallicTextureAlpha = false;
+    mat.useRoughnessFromMetallicTextureGreen = true;
+    mat.useAmbientOcclusionFromMetallicTextureRed = false;
+    mat.useMetallnessFromMetallicTextureBlue = false;
+
+    mat.maxSimultaneousLights = MAX_LIGHTS;
+    return mat;
+  }
+
+  // Repeat tarato sulla dimensione reale delle superfici (pavimento: largo
+  // CORRIDOR_HALF_WIDTH*2, lungo TILE_LEN; muri: larghi TILE_LEN, alti
+  // WALL_HEIGHT) assumendo una tile ~2 unità di mondo per ripetizione:
+  // aggiustare qui se la texture risulta troppo piccola/grande a schermo.
+  const groundMat = makeTiledPbrMaterial("groundMat", (CORRIDOR_HALF_WIDTH * 2) / 2, TILE_LEN / 2);
+
+  const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / 2, WALL_HEIGHT / 2);
   wallMat.backFaceCulling = false;
-  wallMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
   obstacleMat.diffuseColor = new Color3(0.85, 0.2, 0.25);
