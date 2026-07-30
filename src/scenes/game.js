@@ -25,7 +25,7 @@ const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
 
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
-const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "fog_3.png"];
+const FOG_TEXTURES = ["fog_0.png", "face_0.png"];
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
@@ -53,17 +53,17 @@ const WALL_HEIGHT = 10;
 // dentro il raggio ancora visibile della fog attuale (causava un pop-in
 // visibile). Con 40 rientra a ~108, oltre il punto in cui densityFog lo
 // nasconde già quasi del tutto.
-const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
-const LAMP_COUNT = 3; // numero di lampadari attivi contemporaneamente
+const LAMP_GAP = 65; // distanza tra un lampadario e il successivo
+const LAMP_COUNT = 2; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
 const LAMP_BOX_SIZE = 0.8;
-const LAMP_INTENSITY = 0.8;
+const LAMP_INTENSITY = 0.6;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
 // in modo visibile, dando l'effetto di "spegnimento di colpo".
-const LAMP_FADE_DISTANCE = LAMP_GAP;
+const LAMP_FADE_DISTANCE = LAMP_GAP/2;
 // StandardMaterial limita di default a 4 le luci che possono illuminare
 // contemporaneamente una mesh (`maxSimultaneousLights`). Con hemi + N point
 // light dei lampadari si supera facilmente quel budget, e Babylon ne scarta
@@ -89,7 +89,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // distanze restava ~25-30% visibile, e il pop-in si vedeva chiaramente.
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = new Color3(0.53, 0.81, 0.92);
-  scene.fogDensity = 0.02;
+  scene.fogDensity = 0.015;
 
   // ---- Camera (dietro il player, adattata al dispositivo) ----
   const cam = getCameraProfile();
@@ -256,7 +256,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (sinistra→destra o il contrario), attraversa lo schermo con una
   // dissolvenza in entrata/uscita (mai un pop ai margini), poi dopo una
   // pausa casuale ne parte un altro — imprevedibile, non un loop meccanico.
-  const FOG_WALL_Z = SPAWN_AHEAD;
+  const FOG_WALL_Z = SPAWN_AHEAD - 30;
   const FOG_WALL_Y = WALL_HEIGHT * 0.55;
   const FOG_WALL_WIDTH = 10;
   const FOG_WALL_HEIGHT = 6;
