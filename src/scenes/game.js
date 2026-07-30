@@ -55,6 +55,13 @@ const LAMP_INTENSITY = 0.6;
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
 // in modo visibile, dando l'effetto di "spegnimento di colpo".
 const LAMP_FADE_DISTANCE = 6;
+// StandardMaterial limita di default a 4 le luci che possono illuminare
+// contemporaneamente una mesh (`maxSimultaneousLights`). Con hemi + N point
+// light dei lampadari si supera facilmente quel budget, e Babylon ne scarta
+// alcune in modo dipendente dalla configurazione del momento: sembra che
+// "alcune luci non si accendano" anche se esistono e sono posizionate bene.
+// Va impostato esplicitamente su ogni materiale illuminato dai lampadari.
+const MAX_LIGHTS = LAMP_COUNT + 1; // + hemi
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
 const TILE_LEN = 30;
@@ -86,20 +93,24 @@ export async function createGameScene({ engine, canvas, goto }) {
   const groundMat = new StandardMaterial("groundMat", scene);
   groundMat.diffuseColor = new Color3(0.5, 0.5, 0.5);
   groundMat.specularColor = new Color3(0, 0, 0);
+  groundMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const wallMat = new StandardMaterial("wallMat", scene);
   wallMat.diffuseColor = new Color3(0.55, 0.55, 0.58);
   wallMat.specularColor = new Color3(0, 0, 0);
   wallMat.backFaceCulling = false;
+  wallMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
   obstacleMat.diffuseColor = new Color3(0.85, 0.2, 0.25);
   obstacleMat.specularColor = new Color3(0, 0, 0);
+  obstacleMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const coinMat = new StandardMaterial("coinMat", scene);
   coinMat.diffuseColor = new Color3(0.98, 0.75, 0.15);
   coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
   coinMat.specularColor = new Color3(1, 1, 1);
+  coinMat.maxSimultaneousLights = MAX_LIGHTS;
   
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
@@ -229,6 +240,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   billboardMat.diffuseTexture = loadTexture(scene, SIDE_SLIDING_IMAGE_1);
   billboardMat.specularColor = new Color3(0, 0, 0);
   billboardMat.backFaceCulling = false; // visibile da entrambi i lati del piano
+  billboardMat.maxSimultaneousLights = MAX_LIGHTS;
 
   // Cornice bianca dietro ogni cartellone (effetto "quadro incorniciato").
   // Bianco puro e non influenzato dalle luci di scena (disableLighting),
@@ -239,8 +251,9 @@ export async function createGameScene({ engine, canvas, goto }) {
   const billboardFrameMat = new StandardMaterial("billboardFrameMat", scene);
   billboardFrameMat.diffuseColor = new Color3(1, 1, 1);
   // billboardFrameMat.emissiveColor = new Color3(1, 1, 1);
-  billboardFrameMat.specularColor = new Color3(1, 1, 1); 
+  billboardFrameMat.specularColor = new Color3(1, 1, 1);
   billboardFrameMat.disableLighting = false;
+  billboardFrameMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const billboards = [];
   for (let i = 0; i < BILLBOARD_COUNT; i++) {
