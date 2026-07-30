@@ -139,8 +139,8 @@ export async function createGameScene({ engine, canvas, goto }) {
   // lungo il corridoio insieme al resto della scena.
   // const hemi = new HemisphericLight("hemi", new Vector3(0, 0, 1), scene);
   // hemi.intensity = 0.01;
-  const direct = new DirectionalLight("directional", new Vector3(0,-1,0), scene);
-  direct.intensity = 0.4; 
+  const direct = new DirectionalLight("directional", new Vector3(0,-1,1), scene);
+  direct.intensity = 0.5; 
 
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
@@ -184,7 +184,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // CORRIDOR_HALF_WIDTH*2, lungo TILE_LEN; muri: larghi TILE_LEN, alti
   // WALL_HEIGHT) assumendo una tile ~2 unità di mondo per ripetizione:
   // aggiustare qui se la texture risulta troppo piccola/grande a schermo.
-  const groundMat = makeTiledPbrMaterial("groundMat", (CORRIDOR_HALF_WIDTH * 2) / 2, TILE_LEN / 2);
+  const groundMat = makeTiledPbrMaterial("groundMat", TILE_LEN / 2, WALL_HEIGHT / 2);
 
   const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / 2, WALL_HEIGHT / 2);
   wallMat.backFaceCulling = false;
