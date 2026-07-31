@@ -233,6 +233,11 @@ export async function createGameScene({ engine, canvas, goto }) {
     scaling: new Vector3(4, 4, 4), // tarare in base alle dimensioni reali del modello
   });
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
+  // 180°: il modello è importato rivolto verso la camera invece che in avanti.
+  // L'import glTF spesso imposta rotationQuaternion sulla root: se presente,
+  // .rotation viene silenziosamente ignorata da Babylon, quindi va azzerata.
+  player.rotationQuaternion = null;
+  player.rotation.y = Math.PI;
 
 
 
