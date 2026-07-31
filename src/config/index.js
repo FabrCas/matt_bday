@@ -32,6 +32,8 @@ const defaults = {
     rowGap: 9,
     coinRowLength: 3,
     coinSpawnChance: 0.8,
+    redCoinChance: 0.03,   // probabilità (0..1) che una fila generi una moneta rossa bonus
+    redCoinValueMultiplier: 10, // valore della moneta rossa = coinValue * questo fattore
   },
 };
 

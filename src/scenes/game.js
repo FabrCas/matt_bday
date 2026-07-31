@@ -204,7 +204,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
   coinMat.specularColor = new Color3(1, 1, 1);
   coinMat.maxSimultaneousLights = MAX_LIGHTS;
-  
+
+  // Moneta bonus rara (vedi G.redCoinChance/redCoinValueMultiplier): stesso
+  // mesh della moneta normale, solo materiale diverso e valore moltiplicato.
+  const coinRedMat = new StandardMaterial("coinRedMat", scene);
+  coinRedMat.diffuseColor = new Color3(0.9, 0.1, 0.12);
+  coinRedMat.emissiveColor = new Color3(0.55, 0.03, 0.03);
+  coinRedMat.specularColor = new Color3(1, 1, 1);
+  coinRedMat.maxSimultaneousLights = MAX_LIGHTS;
+
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
   // caricamento non deve bloccare l'avvio della scena (vedi audioLoader.js
@@ -458,7 +466,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     scene.onBeforeRenderObservable.add(() => {
         c.rotation.y += 0.1;
     });
-    return { mesh: c, active: false, lane: 0, type: "coin" };
+    return { mesh: c, active: false, lane: 0, type: "coin", value: 1 };
   }
 
 
@@ -505,9 +513,28 @@ export async function createGameScene({ engine, canvas, goto }) {
         if (!co) break;
         co.active = true;
         co.lane = coinLane;
+        co.value = 1;
+        co.mesh.material = coinMat;
         co.mesh.setEnabled(true);
         co.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
         co.mesh.position.set(LANES[coinLane], 1.0, state.nextSpawnZ + k * 1.6);
+      }
+    }
+
+    // Moneta bonus rara, indipendente dalla fila di monete normali: bassa
+    // probabilità, valore moltiplicato (vedi G.redCoinChance/redCoinValueMultiplier).
+    if (Math.random() < G.redCoinChance) {
+      let redLane = Math.floor(Math.random() * 3);
+      if (redLane === obsLane) redLane = (redLane + 1) % 3;
+      const red = spawnFrom(coins);
+      if (red) {
+        red.active = true;
+        red.lane = redLane;
+        red.value = G.redCoinValueMultiplier;
+        red.mesh.material = coinRedMat;
+        red.mesh.setEnabled(true);
+        red.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
+        red.mesh.position.set(LANES[redLane], 1.0, state.nextSpawnZ);
       }
     }
 
@@ -715,7 +742,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       if (Math.abs(co.mesh.position.z) < 0.9 && Math.abs(co.mesh.position.x - px) < 0.9 && Math.abs(py - 1.0) < 1.1) {
         co.active = false;
         co.mesh.setEnabled(false);
-        state.coins += 1;
+        state.coins += co.value;
         coinSfx?.play();
       }
       if (co.mesh.position.z < DESPAWN_BEHIND) {
