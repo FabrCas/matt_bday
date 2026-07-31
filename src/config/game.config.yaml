@@ -17,7 +17,7 @@ game:
   # (es. per disattivare i replay dopo l'evento).
   allowReplay: false
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
-  wishesMessage: "Vittoria sbloccata!\nHai superato la prova, ora puoi accedere al Boss Finale: scegliere come spendere la tua ricompensa.Buon compleanno, dottore!"
+  wishesMessage: "Vittoria sbloccata!\nHai superato la prova, ora puoi accedere al Boss Finale: scegliere come spendere la tua ricompensa.\nBuon compleanno, dottore!"
 
 # --- Scena Auguri ---
 wishes:
