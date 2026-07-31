@@ -239,6 +239,25 @@ export async function createGameScene({ engine, canvas, goto }) {
   player.rotationQuaternion = null;
   player.rotation.y = Math.PI;
 
+  // Fix per materiali importati dal glb:
+  // 1) stesso cap di luci degli altri materiali della scena (vedi MAX_LIGHTS
+  //    più sopra) — senza questo, con directional + N point light dei
+  //    lampadari si supera il default di 4 e Babylon ne scarta alcune sul
+  //    modello, che risulta poco/non illuminato.
+  // 2) forza opacità piena: alcuni export glb portano con sé un alphaMode/
+  //    canale alpha residuo (anche se apparentemente opaco nel tool 3D),
+  //    che Babylon applica come vera trasparenza via transparencyMode.
+  for (const m of playerMeshes) {
+    const mat = m.material;
+    if (!mat) continue;
+    mat.maxSimultaneousLights = MAX_LIGHTS;
+    if (mat.transparencyMode !== undefined) {
+      mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+    }
+    if (mat.alpha !== undefined) mat.alpha = 1;
+    if (mat.albedoColor) mat.albedoColor.a = 1;
+  }
+
 
 
   // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
