@@ -234,6 +234,11 @@ export async function createGameScene({ engine, canvas, goto }) {
     coinSfx = s;
   });
 
+  let coinredSfx = null;
+  loadSound("coin_red.mp3", { volume: 0.8 }).then((s) => {
+    coinredSfx = s;
+  });
+
   let soundtrack = null;
   loadSound("soundtrack_game.mp3", { volume: 0.6 , loop: true}).then((s) => {
     soundtrack = s;
@@ -907,7 +912,11 @@ export async function createGameScene({ engine, canvas, goto }) {
         co.active = false;
         co.mesh.setEnabled(false);
         state.coins += co.value;
-        coinSfx?.play();
+        // if (co.value == G.redCoinValueMultiplier) {
+        //   coinredSfx?.play();
+        // }
+        // else{coinSfx?.play();}
+        co.value == G.redCoinValueMultiplier ? coinredSfx?.play() : coinSfx?.play();  
       }
       if (co.mesh.position.z < DESPAWN_BEHIND) {
         co.active = false;
@@ -927,6 +936,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointerup", onPointerUp);
     disposeSound(coinSfx);
+    disposeSound(coinredSfx);
     disposeSound(soundtrack);
     disposeModel({ meshes: playerMeshes });
     scene.dispose();

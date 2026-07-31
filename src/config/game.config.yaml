@@ -58,5 +58,5 @@ gameplay:
   rowGap: 9               # distanza tra righe di ostacoli/monete
   coinRowLength: 3        # numero di monete per fila
   coinSpawnChance: 0.8    # probabilità (0..1) di spawnare monete in una riga
-  redCoinChance: 0.01     # probabilità (0..1) che una fila generi una moneta rossa bonus
+  redCoinChance: 0.02     # probabilità (0..1) che una fila generi una moneta rossa bonus
   redCoinValueMultiplier: 10 # valore della moneta rossa = coinValue * questo fattore
