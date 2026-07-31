@@ -450,7 +450,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // pool di CONFIG.billboards.images con un sistema "bag" (stile Tetris): le
   // immagini non si ripetono finché non sono uscite tutte, poi il sacchetto
   // viene rimescolato e si ricomincia.
-  const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
+  const BILLBOARD_WALL_GAP = 0.05; // piccolo margine tra il bordo del cartellone e il muro
   const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
   const BILLBOARD_GAP = 70; // distanza tra una coppia di cartelloni e la successiva
   const BILLBOARD_PAIR_COUNT = CONFIG.billboards.count; // coppie sx/dx attive contemporaneamente
@@ -550,15 +550,28 @@ export async function createGameScene({ engine, canvas, goto }) {
     return frame;
   }
 
-  function makeBillboardPlane(name, side, width, height) {
+  // Metà della larghezza mondiale che il piano proietta sull'asse X per
+  // effetto del tilt (vedi BILLBOARD_TILT): un piano ruotato di
+  // (90°-BILLBOARD_TILT) invece che di 90° netti non è più parallelo al
+  // muro, quindi il suo bordo si allarga verso il muro proporzionalmente
+  // alla propria larghezza — le immagini landscape/portrait (larghezze
+  // diverse, vedi billboardSize) proiettano quantità diverse. Senza questo
+  // calcolo il piano compenetrerebbe il muro (o ne resterebbe troppo
+  // distante) a seconda di quale immagine gli viene assegnata.
+  function billboardXProjection(width) {
+    return (width / 2) * Math.sin(BILLBOARD_TILT);
+  }
+
+  function makeBillboardPlane(name, sign, width, height) {
     const b = MeshBuilder.CreatePlane(name, { width, height }, scene);
-    b.position.set(side, BILLBOARD_Y, 0);
+    const x = sign * (CORRIDOR_HALF_WIDTH - BILLBOARD_WALL_GAP - billboardXProjection(width));
+    b.position.set(x, BILLBOARD_Y, 0);
     // Stesso problema dei muri: senza specchiare in base al lato, entrambi i
     // cartelloni avrebbero la normale vera rivolta nella stessa direzione
     // mondiale, e quelli sul lato sinistro risulterebbero sempre in ombra.
     // Il -/+ BILLBOARD_TILT (invece di un ±90° netto) apre entrambi verso la
     // telecamera in arrivo (vedi commento su BILLBOARD_TILT più sopra).
-    b.rotation.y = side > 0 ? Math.PI / 2 - BILLBOARD_TILT : -Math.PI / 2 + BILLBOARD_TILT;
+    b.rotation.y = sign > 0 ? Math.PI / 2 - BILLBOARD_TILT : -Math.PI / 2 + BILLBOARD_TILT;
     return b;
   }
 
@@ -566,11 +579,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (creazione iniziale e ogni riciclo): le dimensioni del piano dipendono
   // dall'orientamento dell'immagine e non possono essere cambiate su una
   // geometria già creata, quindi la mesh precedente va sostituita.
-  function buildBillboardSide(prev, name, side, z, imgName) {
+  function buildBillboardSide(prev, name, sign, z, imgName) {
     if (prev?.frame) prev.frame.dispose();
     if (prev?.plane) prev.plane.dispose();
     const { width, height } = billboardSize(imgName);
-    const plane = makeBillboardPlane(name, side, width, height);
+    const plane = makeBillboardPlane(name, sign, width, height);
     plane.position.z = z;
     plane.material = getBillboardMaterial(imgName);
     const frame = makeBillboardFrame(name + "Frame", plane, width, height);
@@ -581,8 +594,8 @@ export async function createGameScene({ engine, canvas, goto }) {
   for (let i = 0; i < BILLBOARD_PAIR_COUNT; i++) {
     const z = i * BILLBOARD_GAP;
     const img = drawBillboardImage();
-    const left = buildBillboardSide(null, "billboardL" + i, -BILLBOARD_X, z, img);
-    const right = buildBillboardSide(null, "billboardR" + i, BILLBOARD_X, z, img);
+    const left = buildBillboardSide(null, "billboardL" + i, -1, z, img);
+    const right = buildBillboardSide(null, "billboardR" + i, 1, z, img);
     billboards.push({ left, right });
   }
 
@@ -811,8 +824,8 @@ export async function createGameScene({ engine, canvas, goto }) {
         // materiale) perché la nuova immagine può avere un orientamento
         // diverso, quindi un piano/cornice di dimensioni diverse.
         const img = drawBillboardImage();
-        bp.left = buildBillboardSide(bp.left, bp.left.plane.name, -BILLBOARD_X, newZ, img);
-        bp.right = buildBillboardSide(bp.right, bp.right.plane.name, BILLBOARD_X, newZ, img);
+        bp.left = buildBillboardSide(bp.left, bp.left.plane.name, -1, newZ, img);
+        bp.right = buildBillboardSide(bp.right, bp.right.plane.name, 1, newZ, img);
       }
     }
     for (const l of lamps) {
