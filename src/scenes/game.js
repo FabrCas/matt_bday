@@ -19,7 +19,7 @@ import { loadTexture } from "../utils/textureLoader.js";
 import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
-const PLAYER_MODEL = "test.glb";
+const PLAYER_MODEL = "matt.glb";
 
 // Immagine dei cartelloni ai lati della strada: static/assets/imgs/billboard.png
 const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
