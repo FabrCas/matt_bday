@@ -22,7 +22,7 @@ import { loadSound, disposeSound } from "../utils/audioLoader.js";
 const PLAYER_MODEL = "matt.glb";
 
 // Immagine dei cartelloni ai lati della strada: static/assets/imgs/billboard.png
-const SIDE_SLIDING_IMAGE_1= "real_1.jpg";
+const SIDE_SLIDING_IMAGE_1= "billboard_0.jpg";
 
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
@@ -230,14 +230,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (scaling, pivot) una volta importato character.glb.
   const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
     position: new Vector3(0, 0.8, 0),
-    scaling: new Vector3(4, 4, 4), // tarare in base alle dimensioni reali del modello
+    scaling: new Vector3(3.5, 3.5, 3.5), // tarare in base alle dimensioni reali del modello
   });
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
   // 180°: il modello è importato rivolto verso la camera invece che in avanti.
   // L'import glTF spesso imposta rotationQuaternion sulla root: se presente,
   // .rotation viene silenziosamente ignorata da Babylon, quindi va azzerata.
   player.rotationQuaternion = null;
-  player.rotation.y = Math.PI;
+  player.rotation.y = 0;
+
 
   // Fix per materiali importati dal glb:
   // 1) stesso cap di luci degli altri materiali della scena (vedi MAX_LIGHTS
