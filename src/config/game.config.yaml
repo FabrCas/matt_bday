@@ -7,7 +7,7 @@
 # --- Debug ---
 # Se true, mostra a schermo l'hitbox (bounding box) di tutti gli oggetti
 # di gioco (player, ostacoli, monete), utile per calibrare le collisioni.
-debug: true
+debug: false
 
 # --- Testi / branding ---
 game:
@@ -17,11 +17,11 @@ game:
   # (es. per disattivare i replay dopo l'evento).
   allowReplay: false
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
-  wishesMessage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce ut luctus orci. Curabitur ac magna pharetra, finibus arcu eu, rhoncus felis. Quisque sollicitudin nec tellus nec bibendum. Curabitur tincidunt neque vitae velit finibus gravida. Vivamus eu feugiat dolor. Mauris gravida nunc eu fringilla accumsan. Nullam lobortis nec sem quis vestibulum. Praesent dictum ipsum dui, mollis molestie nibh cursus at. Suspendisse nec lectus eros. Maecenas porta euismod massa. Mauris velit nisi, faucibus vitae fringilla et, placerat quis nulla. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec non dictum justo. Aliquam posuere dui non est dignissim ornare. Mauris mollis imperdiet ligula, nec efficitur nisl imperdiet vel. Phasellus consequat vitae enim at rhoncus. Aenean blandit quam tortor, non ornare eros vehicula non. Nullam eu nunc in ex lobortis porta. Morbi ut lectus malesuada, imperdiet turpis in, finibus nisl. Curabitur finibus massa at sem accumsan, eu ultricies leo euismod. Phasellus vitae facilisis purus, eu pellentesque nulla. Sed ut molestie magna, vitae ornare metus. Integer gravida malesuada libero quis bibendum. Morbi nunc nulla, tincidunt id erat at, eleifend viverra mi. Donec lectus ligula, pharetra et nisl sed, mattis blandit purus. Proin sed volutpat risus, commodo mattis dui. Etiam vulputate placerat nibh, at mollis justo pulvinar ac. Nulla iaculis quis enim a bibendum. Mauris quis congue tortor, non varius magna. Cras malesuada pulvinar mi quis rhoncus."
+  wishesMessage: "Vittoria sbloccata!\nHai superato la prova, ora puoi accedere al Boss Finale: scegliere come spendere la tua ricompensa.Buon compleanno, dottore!"
 
 # --- Scena Auguri ---
 wishes:
-  galleryPlaneCount: 9    # numero di piani quadrati che orbitano intorno al testo
+  galleryPlaneCount: 10    # numero di piani quadrati che orbitano intorno al testo
 
 # --- Economia / vincita ---
 economy:

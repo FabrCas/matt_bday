@@ -17,7 +17,33 @@ import { CONFIG } from "../config/index.js";
 // Numero di piani quadrati che orbitano intorno al testo (configurabile in
 // game.config.yaml, sezione `wishes.galleryPlaneCount`).
 const GALLERY_PLANE_COUNT = CONFIG.wishes.galleryPlaneCount;
-const FACE_1 = "face_kermit.png";
+const FACE_KERMIT = "face_kermit.png";
+const FACE_1 = "face_1.png";
+const FACE_2 = "face_2.png";
+const FACE_3 = "face_3.png";
+const FACE_4 = "face_4.png";
+const FACE_5 = "face_kermit.png";
+const FACE_6 = "face_kermit.png";
+const FACE_7 = "face_kermit.png";
+const FACE_8 = "face_kermit.png";
+const FACE_9 = "face_kermit.png";
+const FACES = [
+  FACE_KERMIT,
+  FACE_1,
+  FACE_2,
+  FACE_3,
+  FACE_4,
+  FACE_5,
+  FACE_6,
+  FACE_7,
+  FACE_8,
+  FACE_9
+]
+// const FACE_1 = "face_kermit.png";
+// const FACE_1 = "face_kermit.png";
+// const FACE_1 = "face_kermit.png";
+// const FACE_1 = "face_kermit.png";
+// const FACE_1 = "face_kermit.png";
 
 // Scena Auguri: raggiunta dal bottone "continua" del game over. Il testo di
 // auguri resta al centro (overlay HTML, come prima). Intorno, allo stesso
@@ -59,16 +85,20 @@ export async function createWishesScene({ engine }) {
   const PLANE_SIZE = GALLERY_RADIUS * 0.5; // piani quadrati
   const GALLERY_ROTATION_SPEED = 0.4; // rad/s
 
-  const galleryPlaneMat = new StandardMaterial("wishesGalleryMat", scene);
-  // galleryPlaneMat.diffuseColor = new Color3(0.75, 0.75, 0.8);
-  const galleryTexture = loadTexture(scene, FACE_1);
-  galleryTexture.hasAlpha = true; // il png ha canale alpha: va dichiarato esplicitamente
-  galleryPlaneMat.diffuseTexture = galleryTexture;
-  galleryPlaneMat.useAlphaFromDiffuseTexture = true; // usa l'alpha della texture per la trasparenza
-  galleryPlaneMat.emissiveColor = new Color3(0.75, 0.75, 0.8);
-  galleryPlaneMat.specularColor = new Color3(0, 0, 0);
-  galleryPlaneMat.backFaceCulling = true;
-  galleryPlaneMat.disableLighting = true;
+  let galleryPlaneMatArray = [];
+  for (let i = 0; i < GALLERY_PLANE_COUNT; i++) {
+    const galleryPlaneMat = new StandardMaterial("wishesGalleryMat", scene);
+    // galleryPlaneMat.diffuseColor = new Color3(0.75, 0.75, 0.8);
+    const galleryTexture = loadTexture(scene, FACES[i]);
+    galleryTexture.hasAlpha = true; // il png ha canale alpha: va dichiarato esplicitamente
+    galleryPlaneMat.diffuseTexture = galleryTexture;
+    galleryPlaneMat.useAlphaFromDiffuseTexture = true; // usa l'alpha della texture per la trasparenza
+    galleryPlaneMat.emissiveColor = new Color3(0.75, 0.75, 0.8);
+    galleryPlaneMat.specularColor = new Color3(0, 0, 0);
+    galleryPlaneMat.backFaceCulling = true;
+    galleryPlaneMat.disableLighting = true;
+    galleryPlaneMatArray.push(galleryPlaneMat);
+  }
 
   const galleryPlanes = [];
   for (let i = 0; i < GALLERY_PLANE_COUNT; i++) {
@@ -77,7 +107,7 @@ export async function createWishesScene({ engine }) {
       { width: PLANE_SIZE, height: PLANE_SIZE },
       scene
     );
-    p.material = galleryPlaneMat;
+    p.material = galleryPlaneMatArray[i];
     p.billboardMode = Mesh.BILLBOARDMODE_ALL; // sempre rivolto verso la camera
     galleryPlanes.push({ mesh: p, baseAngle: (i / GALLERY_PLANE_COUNT) * Math.PI * 2 });
   }

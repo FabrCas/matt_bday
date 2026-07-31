@@ -84,7 +84,8 @@ const LAMP_FADE_DISTANCE = LAMP_GAP/2;
 // alcune in modo dipendente dalla configurazione del momento: sembra che
 // "alcune luci non si accendano" anche se esistono e sono posizionate bene.
 // Va impostato esplicitamente su ogni materiale illuminato dai lampadari.
-const MAX_LIGHTS = LAMP_COUNT + 2; // + direzionale + playerLight
+// const MAX_LIGHTS = LAMP_COUNT + 2; // + direzionale + playerLight
+const MAX_LIGHTS = LAMP_COUNT + 1; // + direzionale + playerLight
 // ---- Velo di nebbia all'orizzonte (attraversa la vista uno alla volta) ----
 // Posizionato esattamente a SPAWN_AHEAD: è lo stesso punto in cui
 // compaiono ostacoli/monete, cioè il limite di ciò che è ancora
@@ -151,10 +152,10 @@ export async function createGameScene({ engine, canvas, goto }) {
   // Luce dedicata che segue il player (aggiornata in update()): a differenza
   // dei lampadari, che lo illuminano solo quando è vicino, garantisce un
   // effetto luce sempre forte e costante sul modello durante tutta la corsa.
-  const playerLight = new PointLight("playerLight", new Vector3(0, 3, -1), scene);
-  playerLight.intensity = 1.2;
-  playerLight.diffuse = new Color3(1, 1, 1);
-  playerLight.specular = new Color3(1, 1, 1);
+  // const playerLight = new PointLight("playerLight", new Vector3(0, 3, -1), scene);
+  // playerLight.intensity = 1.2;
+  // playerLight.diffuse = new Color3(1, 1, 1);
+  // playerLight.specular = new Color3(1, 1, 1);
 
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
@@ -667,7 +668,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     player.position.x += (state.targetX - player.position.x) * Math.min(1, LANE_LERP * dt);
 
     // Luce dedicata sempre allineata al player (vedi dichiarazione più sopra).
-    playerLight.position.set(player.position.x, player.position.y + 2, player.position.z - 1);
+    // playerLight.position.set(player.position.x, player.position.y + 2, player.position.z - 1);
 
     // Salto (integrazione verticale kinematica).
     if (!state.grounded) {
