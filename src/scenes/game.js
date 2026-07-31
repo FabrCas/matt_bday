@@ -430,10 +430,10 @@ export async function createGameScene({ engine, canvas, goto }) {
   // viene rimescolato e si ricomincia.
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
   const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
-  const BILLBOARD_GAP = 14; // distanza tra una coppia di cartelloni e la successiva
+  const BILLBOARD_GAP = 70; // distanza tra una coppia di cartelloni e la successiva
   const BILLBOARD_PAIR_COUNT = CONFIG.billboards.count; // coppie sx/dx attive contemporaneamente
-  const BILLBOARD_WIDTH = 3;
-  const BILLBOARD_HEIGHT = 2;
+  const BILLBOARD_WIDTH = 7;
+  const BILLBOARD_HEIGHT = 5;
 
   // Un materiale per immagine, riusato da tutte le coppie che in un dato
   // momento mostrano quella stessa immagine (niente texture duplicate).
