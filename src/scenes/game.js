@@ -117,9 +117,9 @@ const FOG_COOLDOWN_MAX = 4;
 
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
-const TILE_LEN = 35;
+const TILE_LEN = 30;
 const NUM_TILES = 6;
-const CORRIDOR_HALF_WIDTH = 10; // muri/soffitto arrivano esattamente qui
+const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
 
 export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
