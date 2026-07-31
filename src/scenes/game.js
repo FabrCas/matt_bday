@@ -230,7 +230,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (scaling, pivot) una volta importato character.glb.
   const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
     position: new Vector3(0, 0.8, 0),
-    // scaling: new Vector3(1, 1, 1), // tarare in base alle dimensioni reali del modello
+    scaling: new Vector3(4, 4, 4), // tarare in base alle dimensioni reali del modello
   });
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
 
