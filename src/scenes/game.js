@@ -14,7 +14,7 @@ import {
 import * as ui from "../ui/ui.js";
 import { getCameraProfile } from "../utils/responsive.js";
 import { CONFIG, computePayout } from "../config/index.js";
-import { loadModel, disposeModel } from "../utils/modelLoader.js";
+import { loadModel, loadModelContainer, disposeModel } from "../utils/modelLoader.js";
 import { loadTexture, loadHtmlImage } from "../utils/textureLoader.js";
 import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
@@ -72,8 +72,8 @@ const WALL_HEIGHT = 10;
 const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
 const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
-const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il box
-const LAMP_BOX_SIZE = 0.8;
+const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il modello
+const CHANDELIER_SCALE = 1; // tarare in base alle dimensioni reali del modello lamp.glb
 const LAMP_INTENSITY = 1;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
@@ -256,20 +256,13 @@ export async function createGameScene({ engine, canvas, goto }) {
   player.rotation.y = 0;
 
 
-  //chandelier
-  const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
-    position: new Vector3(0, 0.8, 0),
-    scaling: new Vector3(2, 2, 2), // tarare in base alle dimensioni reali del modello
-  });
-  if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
-  // 180°: il modello è importato rivolto verso la camera invece che in avanti.
-  // L'import glTF spesso imposta rotationQuaternion sulla root: se presente,
-  // .rotation viene silenziosamente ignorata da Babylon, quindi va azzerata.
-  player.rotationQuaternion = null;
-  player.rotation.y = 0;
-  
+  // ---- Modello lampadario (glb) ----
+  // Caricato una sola volta come AssetContainer e istanziato LAMP_COUNT volte
+  // (vedi il ciclo `lamps` più sotto), al posto del box giallo placeholder:
+  // evita di scaricare/parsare il file una volta per ogni lampadario.
+  const chandelierContainer = await loadModelContainer(scene, CHANDELIER_MODEL);
 
-  // Fix per materiali importati dal glb:
+  // Fix per materiali importati da glb (player, lampadari, ecc.):
   // 1) stesso cap di luci degli altri materiali della scena (vedi MAX_LIGHTS
   //    più sopra) — senza questo, con directional + N point light dei
   //    lampadari si supera il default di 4 e Babylon ne scarta alcune sul
@@ -277,16 +270,19 @@ export async function createGameScene({ engine, canvas, goto }) {
   // 2) forza opacità piena: alcuni export glb portano con sé un alphaMode/
   //    canale alpha residuo (anche se apparentemente opaco nel tool 3D),
   //    che Babylon applica come vera trasparenza via transparencyMode.
-  for (const m of playerMeshes) {
-    const mat = m.material;
-    if (!mat) continue;
-    mat.maxSimultaneousLights = MAX_LIGHTS;
-    if (mat.transparencyMode !== undefined) {
-      mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+  function fixImportedMaterials(meshes) {
+    for (const m of meshes) {
+      const mat = m.material;
+      if (!mat) continue;
+      mat.maxSimultaneousLights = MAX_LIGHTS;
+      if (mat.transparencyMode !== undefined) {
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+      }
+      if (mat.alpha !== undefined) mat.alpha = 1;
+      if (mat.albedoColor) mat.albedoColor.a = 1;
     }
-    if (mat.alpha !== undefined) mat.alpha = 1;
-    if (mat.albedoColor) mat.albedoColor.a = 1;
   }
+  fixImportedMaterials(playerMeshes);
 
 
 
@@ -347,19 +343,26 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
 
-  const lampMat = new StandardMaterial("lampMat", scene);
-  lampMat.diffuseColor = new Color3(0.95, 0.85, 0.2);
-  lampMat.emissiveColor = new Color3(0.6, 0.5, 0.05);
-  lampMat.specularColor = new Color3(0, 0, 0);
-
   const lamps = [];
   for (let i = 0; i < LAMP_COUNT; i++) {
     const z = i * LAMP_GAP;
-    const box = MeshBuilder.CreateBox("lampBox" + i, { size: LAMP_BOX_SIZE }, scene);
-    box.material = lampMat;
-    box.position.set(0, LAMP_BOX_Y, z);
 
-    // Posizione iniziale della luce ricavata dal box (vedi update(): resta
+    // Istanza del modello lampadario (vedi chandelierContainer più sopra) al
+    // posto del vecchio box giallo placeholder. `instantiateModelsToScene`
+    // clona la gerarchia di nodi ma riusa i materiali (cloneMaterials:
+    // false), quindi tutte le istanze condividono le stesse texture/draw
+    // call di materiale.
+    const { rootNodes } = chandelierContainer.instantiateModelsToScene(
+      (name) => `${name}_lamp${i}`,
+      false
+    );
+    const model = rootNodes[0];
+    model.position.set(0, LAMP_BOX_Y, z);
+    model.scaling.set(CHANDELIER_SCALE, CHANDELIER_SCALE, CHANDELIER_SCALE);
+    if (DEBUG) model.getChildMeshes().forEach((m) => (m.showBoundingBox = true));
+    fixImportedMaterials(model.getChildMeshes());
+
+    // Posizione iniziale della luce ricavata dal modello (vedi update(): resta
     // sempre derivata da esso, non c'è uno stato separato che possa
     // disallinearsi).
     const light = new PointLight("lampLight" + i, Vector3.Zero(), scene);
@@ -370,8 +373,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     // solo quelle vicine al player contribuiscono in modo visibile.
 
     // Marker di debug: sfera rossa esattamente sulla posizione della luce,
-    // per verificare a video che resti sempre allineata al box giallo
-    // (utile per confermare/escludere drift box↔luce).
+    // per verificare a video che resti sempre allineata al modello
+    // (utile per confermare/escludere drift modello↔luce).
     let debugMarker = null;
     if (DEBUG) {
       debugMarker = MeshBuilder.CreateSphere("lampLightMarker" + i, { diameter: 0.2 }, scene);
@@ -381,7 +384,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       debugMarker.material = debugMarkerMat;
     }
 
-    lamps.push({ box, light, debugMarker });
+    lamps.push({ model, light, debugMarker });
   }
 
 
@@ -801,21 +804,21 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
     for (const l of lamps) {
-      l.box.position.z -= move;
-      if (l.box.position.z < DESPAWN_BEHIND) {
-        l.box.position.z += LAMP_GAP * LAMP_COUNT;
+      l.model.position.z -= move;
+      if (l.model.position.z < DESPAWN_BEHIND) {
+        l.model.position.z += LAMP_GAP * LAMP_COUNT;
       }
-      // Luce sempre allineata al box: posizione ricavata da esso ogni frame
-      // invece di un secondo stato aggiornato in parallelo.
-      l.light.position.x = l.box.position.x;
-      l.light.position.y = l.box.position.y - LAMP_LIGHT_DROP;
-      l.light.position.z = l.box.position.z;
+      // Luce sempre allineata al modello: posizione ricavata da esso ogni
+      // frame invece di un secondo stato aggiornato in parallelo.
+      l.light.position.x = l.model.position.x;
+      l.light.position.y = l.model.position.y - LAMP_LIGHT_DROP;
+      l.light.position.z = l.model.position.z;
       if (l.debugMarker) l.debugMarker.position.copyFrom(l.light.position);
 
       // Dissolvenza vicino al bordo di riciclo: l'intensità scende a 0 prima
       // che il lampadario venga teletrasportato in avanti, così il "salto"
       // non si vede più come uno spegnimento improvviso.
-      const distFromRecycle = l.box.position.z - DESPAWN_BEHIND;
+      const distFromRecycle = l.model.position.z - DESPAWN_BEHIND;
       const fade = Math.min(1, Math.max(0, distFromRecycle / LAMP_FADE_DISTANCE));
       l.light.intensity = LAMP_INTENSITY * fade;
     }
