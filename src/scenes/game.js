@@ -15,7 +15,7 @@ import * as ui from "../ui/ui.js";
 import { getCameraProfile } from "../utils/responsive.js";
 import { CONFIG, computePayout } from "../config/index.js";
 import { loadModel, disposeModel } from "../utils/modelLoader.js";
-import { loadTexture } from "../utils/textureLoader.js";
+import { loadTexture, loadHtmlImage } from "../utils/textureLoader.js";
 import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
@@ -432,8 +432,33 @@ export async function createGameScene({ engine, canvas, goto }) {
   const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
   const BILLBOARD_GAP = 70; // distanza tra una coppia di cartelloni e la successiva
   const BILLBOARD_PAIR_COUNT = CONFIG.billboards.count; // coppie sx/dx attive contemporaneamente
+  // Dimensioni "landscape" (larghezza > altezza) di riferimento: per le
+  // immagini portrait (più alte che larghe) vengono scambiate, vedi
+  // billboardIsPortrait/billboardSize più sotto, così il cartellone non
+  // risulta mai stirato rispetto alle proporzioni reali dell'immagine.
   const BILLBOARD_WIDTH = 7;
   const BILLBOARD_HEIGHT = 5;
+
+  // Orientamento reale di ciascuna immagine (portrait/landscape), letto una
+  // sola volta all'avvio dalle dimensioni naturali del file — non deducibile
+  // dal nome. Va risolto prima di creare i piani, perché determina se usare
+  // BILLBOARD_WIDTH/HEIGHT dritte o scambiate.
+  const billboardIsPortrait = new Map();
+  await Promise.all(
+    BILLBOARD_IMAGES.map(async (img) => {
+      try {
+        const el = await loadHtmlImage(img);
+        billboardIsPortrait.set(img, el.naturalHeight > el.naturalWidth);
+      } catch {
+        billboardIsPortrait.set(img, false); // fallback landscape se l'immagine non carica
+      }
+    })
+  );
+  function billboardSize(imgName) {
+    return billboardIsPortrait.get(imgName)
+      ? { width: BILLBOARD_HEIGHT, height: BILLBOARD_WIDTH }
+      : { width: BILLBOARD_WIDTH, height: BILLBOARD_HEIGHT };
+  }
 
   // Un materiale per immagine, riusato da tutte le coppie che in un dato
   // momento mostrano quella stessa immagine (niente texture duplicate).
@@ -478,14 +503,10 @@ export async function createGameScene({ engine, canvas, goto }) {
   billboardFrameMat.disableLighting = false;
   billboardFrameMat.maxSimultaneousLights = MAX_LIGHTS;
 
-  function makeBillboardFrame(name, parentPlane) {
+  function makeBillboardFrame(name, parentPlane, width, height) {
     const frame = MeshBuilder.CreateBox(
       name,
-      {
-        width: BILLBOARD_WIDTH + FRAME_MARGIN,
-        height: BILLBOARD_HEIGHT + FRAME_MARGIN,
-        depth: FRAME_THICKNESS,
-      },
+      { width: width + FRAME_MARGIN, height: height + FRAME_MARGIN, depth: FRAME_THICKNESS },
       scene
     );
     frame.material = billboardFrameMat;
@@ -498,8 +519,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     return frame;
   }
 
-  function makeBillboardPlane(name, side) {
-    const b = MeshBuilder.CreatePlane(name, { width: BILLBOARD_WIDTH, height: BILLBOARD_HEIGHT }, scene);
+  function makeBillboardPlane(name, side, width, height) {
+    const b = MeshBuilder.CreatePlane(name, { width, height }, scene);
     b.position.set(side, BILLBOARD_Y, 0);
     // Stesso problema dei muri: senza specchiare in base al lato, entrambi i
     // cartelloni avrebbero la normale vera rivolta nella stessa direzione
@@ -508,21 +529,27 @@ export async function createGameScene({ engine, canvas, goto }) {
     return b;
   }
 
+  // Un cartellone (piano + cornice) viene ricreato ad ogni cambio immagine
+  // (creazione iniziale e ogni riciclo): le dimensioni del piano dipendono
+  // dall'orientamento dell'immagine e non possono essere cambiate su una
+  // geometria già creata, quindi la mesh precedente va sostituita.
+  function buildBillboardSide(prev, name, side, z, imgName) {
+    if (prev?.frame) prev.frame.dispose();
+    if (prev?.plane) prev.plane.dispose();
+    const { width, height } = billboardSize(imgName);
+    const plane = makeBillboardPlane(name, side, width, height);
+    plane.position.z = z;
+    plane.material = getBillboardMaterial(imgName);
+    const frame = makeBillboardFrame(name + "Frame", plane, width, height);
+    return { plane, frame };
+  }
+
   const billboards = []; // { left, right } — stessa immagine su entrambi, sincronizzati in z
   for (let i = 0; i < BILLBOARD_PAIR_COUNT; i++) {
     const z = i * BILLBOARD_GAP;
-    const mat = getBillboardMaterial(drawBillboardImage());
-
-    const left = makeBillboardPlane("billboardL" + i, -BILLBOARD_X);
-    left.position.z = z;
-    left.material = mat;
-    makeBillboardFrame("billboardFrameL" + i, left);
-
-    const right = makeBillboardPlane("billboardR" + i, BILLBOARD_X);
-    right.position.z = z;
-    right.material = mat;
-    makeBillboardFrame("billboardFrameR" + i, right);
-
+    const img = drawBillboardImage();
+    const left = buildBillboardSide(null, "billboardL" + i, -BILLBOARD_X, z, img);
+    const right = buildBillboardSide(null, "billboardR" + i, BILLBOARD_X, z, img);
     billboards.push({ left, right });
   }
 
@@ -741,17 +768,17 @@ export async function createGameScene({ engine, canvas, goto }) {
     //   if (s.position.z < DESPAWN_BEHIND) s.position.z += 4 * stripes.length;
     // }
     for (const bp of billboards) {
-      bp.left.position.z -= move;
-      bp.right.position.z -= move;
-      if (bp.left.position.z < DESPAWN_BEHIND) {
-        const newZ = bp.left.position.z + BILLBOARD_GAP * billboards.length;
-        bp.left.position.z = newZ;
-        bp.right.position.z = newZ;
+      bp.left.plane.position.z -= move;
+      bp.right.plane.position.z -= move;
+      if (bp.left.plane.position.z < DESPAWN_BEHIND) {
+        const newZ = bp.left.plane.position.z + BILLBOARD_GAP * billboards.length;
         // Nuova immagine ad ogni riciclo, pescata dal sacchetto: stessa su
-        // entrambi i lati della coppia.
-        const mat = getBillboardMaterial(drawBillboardImage());
-        bp.left.material = mat;
-        bp.right.material = mat;
+        // entrambi i lati della coppia. La mesh va ricreata (non solo il
+        // materiale) perché la nuova immagine può avere un orientamento
+        // diverso, quindi un piano/cornice di dimensioni diverse.
+        const img = drawBillboardImage();
+        bp.left = buildBillboardSide(bp.left, bp.left.plane.name, -BILLBOARD_X, newZ, img);
+        bp.right = buildBillboardSide(bp.right, bp.right.plane.name, BILLBOARD_X, newZ, img);
       }
     }
     for (const l of lamps) {
