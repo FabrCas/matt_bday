@@ -20,6 +20,7 @@ import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "matt.glb";
+const CHANDELIER_MODEL = "lamp.glb";
 
 // Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
 // a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
@@ -233,6 +234,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     coinSfx = s;
   });
 
+  let soundtrack = null;
+  loadSound("soundtrack_game.mp3", { volume: 0.6 , loop: true}).then((s) => {
+    soundtrack = s;
+  });
 
   // ---- Player (modello importato) ----
   // Nota: 0.8 come altezza da terra e le soglie di collisione più sotto
@@ -241,7 +246,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (scaling, pivot) una volta importato character.glb.
   const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
     position: new Vector3(0, 0.8, 0),
-    scaling: new Vector3(3.5, 3.5, 3.5), // tarare in base alle dimensioni reali del modello
+    scaling: new Vector3(2, 2, 2), // tarare in base alle dimensioni reali del modello
   });
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
   // 180°: il modello è importato rivolto verso la camera invece che in avanti.
@@ -250,6 +255,19 @@ export async function createGameScene({ engine, canvas, goto }) {
   player.rotationQuaternion = null;
   player.rotation.y = 0;
 
+
+  //chandelier
+  const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
+    position: new Vector3(0, 0.8, 0),
+    scaling: new Vector3(2, 2, 2), // tarare in base alle dimensioni reali del modello
+  });
+  if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
+  // 180°: il modello è importato rivolto verso la camera invece che in avanti.
+  // L'import glTF spesso imposta rotationQuaternion sulla root: se presente,
+  // .rotation viene silenziosamente ignorata da Babylon, quindi va azzerata.
+  player.rotationQuaternion = null;
+  player.rotation.y = 0;
+  
 
   // Fix per materiali importati dal glb:
   // 1) stesso cap di luci degli altri materiali della scena (vedi MAX_LIGHTS
@@ -436,8 +454,8 @@ export async function createGameScene({ engine, canvas, goto }) {
   // immagini portrait (più alte che larghe) vengono scambiate, vedi
   // billboardIsPortrait/billboardSize più sotto, così il cartellone non
   // risulta mai stirato rispetto alle proporzioni reali dell'immagine.
-  const BILLBOARD_WIDTH = 7;
-  const BILLBOARD_HEIGHT = 5;
+  const BILLBOARD_WIDTH = 5;
+  const BILLBOARD_HEIGHT = 3;
 
   // Orientamento reale di ciascuna immagine (portrait/landscape), letto una
   // sola volta all'avvio dalle dimensioni naturali del file — non deducibile
@@ -647,6 +665,7 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   // Pre-popola qualche riga davanti al player.
   for (let i = 0; i < 6; i++) spawnRow();
+  soundtrack?.play();
 
   // ===== Input =====
   function changeLane(dir) {
@@ -880,6 +899,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointerup", onPointerUp);
     disposeSound(coinSfx);
+    disposeSound(soundtrack);
     disposeModel({ meshes: playerMeshes });
     scene.dispose();
   }
