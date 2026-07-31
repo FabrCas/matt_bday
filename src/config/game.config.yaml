@@ -23,6 +23,21 @@ game:
 wishes:
   galleryPlaneCount: 10    # numero di piani quadrati che orbitano intorno al testo
 
+# --- Cartelloni pubblicitari del corridoio ---
+billboards:
+  count: 8                # numero di coppie sx/dx lungo il corridoio (riciclate come il resto)
+  images:                  # pool di immagini pescate a caso, senza ripetizioni finché non escono tutte
+    - "billboard_0.jpg"
+    - "billboard_1.jpg"
+    - "billboard_2.jpg"
+    - "billboard_3.jpg"
+    - "billboard_4.jpg"
+    - "billboard_5.jpg"
+    - "billboard_6.jpg"
+    - "billboard_7.jpg"
+    - "billboard_8.jpg"
+    - "billboard_9.jpg"
+
 # --- Economia / vincita ---
 economy:
   currencySymbol: "€"

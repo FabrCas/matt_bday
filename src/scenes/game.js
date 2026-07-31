@@ -21,8 +21,9 @@ import { loadSound, disposeSound } from "../utils/audioLoader.js";
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "matt.glb";
 
-// Immagine dei cartelloni ai lati della strada: static/assets/imgs/billboard.png
-const SIDE_SLIDING_IMAGE_1= "billboard_0.jpg";
+// Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
+// a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
+const BILLBOARD_IMAGES = CONFIG.billboards.images.length ? CONFIG.billboards.images : ["billboard_0.jpg"];
 
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
@@ -423,17 +424,47 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
+  // Ogni "coppia" (sx+dx) mostra sempre la stessa immagine, pescata a caso dal
+  // pool di CONFIG.billboards.images con un sistema "bag" (stile Tetris): le
+  // immagini non si ripetono finché non sono uscite tutte, poi il sacchetto
+  // viene rimescolato e si ricomincia.
   const BILLBOARD_X = CORRIDOR_HALF_WIDTH - 0.05;
   const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
-  const BILLBOARD_GAP = 14; // distanza tra un cartellone e il successivo (per lato)
-  const BILLBOARD_COUNT = 8; // totale, alternati sui due lati
+  const BILLBOARD_GAP = 14; // distanza tra una coppia di cartelloni e la successiva
+  const BILLBOARD_PAIR_COUNT = CONFIG.billboards.count; // coppie sx/dx attive contemporaneamente
   const BILLBOARD_WIDTH = 3;
   const BILLBOARD_HEIGHT = 2;
-  const billboardMat = new StandardMaterial("billboardMat", scene);
-  billboardMat.diffuseTexture = loadTexture(scene, SIDE_SLIDING_IMAGE_1);
-  billboardMat.specularColor = new Color3(0, 0, 0);
-  billboardMat.backFaceCulling = false; // visibile da entrambi i lati del piano
-  billboardMat.maxSimultaneousLights = MAX_LIGHTS;
+
+  // Un materiale per immagine, riusato da tutte le coppie che in un dato
+  // momento mostrano quella stessa immagine (niente texture duplicate).
+  const billboardMatCache = new Map();
+  function getBillboardMaterial(imgName) {
+    let mat = billboardMatCache.get(imgName);
+    if (!mat) {
+      mat = new StandardMaterial("billboardMat_" + imgName, scene);
+      mat.diffuseTexture = loadTexture(scene, imgName);
+      mat.specularColor = new Color3(0, 0, 0);
+      mat.backFaceCulling = false; // visibile da entrambi i lati del piano
+      mat.maxSimultaneousLights = MAX_LIGHTS;
+      billboardMatCache.set(imgName, mat);
+    }
+    return mat;
+  }
+
+  // Sacchetto di indici: si svuota pescando senza reinserire, si rimescola
+  // (Fisher-Yates) solo quando è vuoto — garantisce "nessuna ripetizione
+  // finché le altre non sono già uscite", non una semplice scelta uniforme.
+  let billboardBag = [];
+  function drawBillboardImage() {
+    if (billboardBag.length === 0) {
+      billboardBag = Array.from({ length: BILLBOARD_IMAGES.length }, (_, i) => i);
+      for (let i = billboardBag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [billboardBag[i], billboardBag[j]] = [billboardBag[j], billboardBag[i]];
+      }
+    }
+    return BILLBOARD_IMAGES[billboardBag.pop()];
+  }
 
   // Cornice bianca dietro ogni cartellone (effetto "quadro incorniciato").
   // Bianco puro e non influenzato dalle luci di scena (disableLighting),
@@ -443,33 +474,13 @@ export async function createGameScene({ engine, canvas, goto }) {
   const FRAME_OFFSET = FRAME_THICKNESS / 2 + 0.02; // dietro l'immagine, verso il muro
   const billboardFrameMat = new StandardMaterial("billboardFrameMat", scene);
   billboardFrameMat.diffuseColor = new Color3(1, 1, 1);
-  // billboardFrameMat.emissiveColor = new Color3(1, 1, 1);
   billboardFrameMat.specularColor = new Color3(1, 1, 1);
   billboardFrameMat.disableLighting = false;
   billboardFrameMat.maxSimultaneousLights = MAX_LIGHTS;
 
-  const billboards = [];
-  for (let i = 0; i < BILLBOARD_COUNT; i++) {
-    const b = MeshBuilder.CreatePlane(
-      "billboard" + i,
-      { width: BILLBOARD_WIDTH, height: BILLBOARD_HEIGHT },
-      scene
-    );
-    b.material = billboardMat;
-    const side = i % 2 === 0 ? -BILLBOARD_X : BILLBOARD_X;
-    b.position.set(side, BILLBOARD_Y, i * BILLBOARD_GAP);
-    // Stesso problema dei muri: senza specchiare in base al lato, entrambi i
-    // cartelloni avrebbero la normale vera rivolta nella stessa direzione
-    // mondiale, e quelli sul lato sinistro risulterebbero sempre in ombra.
-    b.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2; // normale rivolta verso il centro strada
-
-    // Piano figlio: segue automaticamente posizione/rotazione del cartellone
-    // (compreso lo scorrimento nel loop di update), nessun codice aggiuntivo
-    // necessario. Spostata lungo l'asse Z locale (= normale del cartellone),
-    // che grazie alla rotazione già specchiata sopra punta sempre verso il
-    // muro del proprio lato per entrambi i lati.
+  function makeBillboardFrame(name, parentPlane) {
     const frame = MeshBuilder.CreateBox(
-      "billboardFrame" + i,
+      name,
       {
         width: BILLBOARD_WIDTH + FRAME_MARGIN,
         height: BILLBOARD_HEIGHT + FRAME_MARGIN,
@@ -478,10 +489,41 @@ export async function createGameScene({ engine, canvas, goto }) {
       scene
     );
     frame.material = billboardFrameMat;
-    frame.parent = b;
+    frame.parent = parentPlane;
+    // Piano figlio: segue automaticamente posizione/rotazione del cartellone
+    // (compreso lo scorrimento nel loop di update). Spostata lungo l'asse Z
+    // locale (= normale del cartellone), che grazie alla rotazione già
+    // specchiata in base al lato punta sempre verso il muro del proprio lato.
     frame.position.set(0, 0, FRAME_OFFSET);
+    return frame;
+  }
 
-    billboards.push(b);
+  function makeBillboardPlane(name, side) {
+    const b = MeshBuilder.CreatePlane(name, { width: BILLBOARD_WIDTH, height: BILLBOARD_HEIGHT }, scene);
+    b.position.set(side, BILLBOARD_Y, 0);
+    // Stesso problema dei muri: senza specchiare in base al lato, entrambi i
+    // cartelloni avrebbero la normale vera rivolta nella stessa direzione
+    // mondiale, e quelli sul lato sinistro risulterebbero sempre in ombra.
+    b.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2; // normale rivolta verso il centro strada
+    return b;
+  }
+
+  const billboards = []; // { left, right } — stessa immagine su entrambi, sincronizzati in z
+  for (let i = 0; i < BILLBOARD_PAIR_COUNT; i++) {
+    const z = i * BILLBOARD_GAP;
+    const mat = getBillboardMaterial(drawBillboardImage());
+
+    const left = makeBillboardPlane("billboardL" + i, -BILLBOARD_X);
+    left.position.z = z;
+    left.material = mat;
+    makeBillboardFrame("billboardFrameL" + i, left);
+
+    const right = makeBillboardPlane("billboardR" + i, BILLBOARD_X);
+    right.position.z = z;
+    right.material = mat;
+    makeBillboardFrame("billboardFrameR" + i, right);
+
+    billboards.push({ left, right });
   }
 
   // ---- Pool ostacoli e monete ----
@@ -698,9 +740,19 @@ export async function createGameScene({ engine, canvas, goto }) {
     //   s.position.z -= move;
     //   if (s.position.z < DESPAWN_BEHIND) s.position.z += 4 * stripes.length;
     // }
-    for (const b of billboards) {
-      b.position.z -= move;
-      if (b.position.z < DESPAWN_BEHIND) b.position.z += BILLBOARD_GAP * billboards.length;
+    for (const bp of billboards) {
+      bp.left.position.z -= move;
+      bp.right.position.z -= move;
+      if (bp.left.position.z < DESPAWN_BEHIND) {
+        const newZ = bp.left.position.z + BILLBOARD_GAP * billboards.length;
+        bp.left.position.z = newZ;
+        bp.right.position.z = newZ;
+        // Nuova immagine ad ogni riciclo, pescata dal sacchetto: stessa su
+        // entrambi i lati della coppia.
+        const mat = getBillboardMaterial(drawBillboardImage());
+        bp.left.material = mat;
+        bp.right.material = mat;
+      }
     }
     for (const l of lamps) {
       l.box.position.z -= move;
