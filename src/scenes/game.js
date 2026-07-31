@@ -460,6 +460,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   // risulta mai stirato rispetto alle proporzioni reali dell'immagine.
   const BILLBOARD_WIDTH = 5;
   const BILLBOARD_HEIGHT = 3;
+  // Angolate leggermente verso chi arriva (come i cartelloni pubblicitari
+  // veri lungo una strada), invece di stare di taglio a 90° rispetto al
+  // corridoio: a 90° la faccia frontale è rivolta solo verso il centro
+  // strada e risulta visibile quasi di striscio finché il player non è
+  // praticamente affiancato. Riducendo l'angolo si guadagna un componente
+  // rivolta all'indietro (verso la telecamera in arrivo), quindi il
+  // cartellone si "apre" verso l'inquadratura molto prima, restando
+  // leggibile per un tratto più lungo.
+  const BILLBOARD_TILT = Math.PI / 6; // 30°
 
   // Orientamento reale di ciascuna immagine (portrait/landscape), letto una
   // sola volta all'avvio dalle dimensioni naturali del file — non deducibile
@@ -547,7 +556,9 @@ export async function createGameScene({ engine, canvas, goto }) {
     // Stesso problema dei muri: senza specchiare in base al lato, entrambi i
     // cartelloni avrebbero la normale vera rivolta nella stessa direzione
     // mondiale, e quelli sul lato sinistro risulterebbero sempre in ombra.
-    b.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2; // normale rivolta verso il centro strada
+    // Il -/+ BILLBOARD_TILT (invece di un ±90° netto) apre entrambi verso la
+    // telecamera in arrivo (vedi commento su BILLBOARD_TILT più sopra).
+    b.rotation.y = side > 0 ? Math.PI / 2 - BILLBOARD_TILT : -Math.PI / 2 + BILLBOARD_TILT;
     return b;
   }
 
