@@ -249,16 +249,26 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (py < 1.6, |py - 1.0| < 1.1) erano tarate sulla capsula placeholder;
   // vanno riverificate/aggiustate in base alle dimensioni reali del modello
   // (scaling, pivot) una volta importato character.glb.
-  const { root: player, meshes: playerMeshes } = await loadModel(scene, PLAYER_MODEL, {
-    position: new Vector3(0, 0.8, 0),
-    scaling: new Vector3(2, 2, 2), // tarare in base alle dimensioni reali del modello
-  });
+  const { root: player, meshes: playerMeshes, animationGroups: playerAnimationGroups } = await loadModel(
+    scene,
+    PLAYER_MODEL,
+    {
+      position: new Vector3(0, 0.8, 0),
+      scaling: new Vector3(2, 2, 2), // tarare in base alle dimensioni reali del modello
+    }
+  );
   if (DEBUG) playerMeshes.forEach((m) => (m.showBoundingBox = true));
   // 180°: il modello è importato rivolto verso la camera invece che in avanti.
   // L'import glTF spesso imposta rotationQuaternion sulla root: se presente,
   // .rotation viene silenziosamente ignorata da Babylon, quindi va azzerata.
   player.rotationQuaternion = null;
   player.rotation.y = 0;
+  // Avviata subito (non lasciata al default, che con SceneLoader.ImportMeshAsync
+  // non fa autoplay): senza questo il modello resta in T-pose finché qualcos'altro
+  // non la avvia, ed è esattamente il "flash" in T-pose visto prima che l'animazione
+  // parta. Avviarla qui, prima dello whenReadyAsync più sotto, garantisce che sia
+  // già in corso quando la schermata di loading viene nascosta.
+  playerAnimationGroups.forEach((ag) => ag.start(true));
 
 
   // ---- Modello lampadario (glb) ----
@@ -773,6 +783,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     goto("gameover", { coins: state.coins, distance: state.distance, amount: CONFIG.economy.maxPayout, message: gameover_message});
   }
 
+  // Aspetta che tutte le texture/materiali (pavimento, muri, cartelloni,
+  // lampadari, nebbia, ecc.) siano effettivamente pronti prima di far
+  // rientrare la promise: `goto()` in main.js tiene la schermata di loading
+  // finché questa funzione non ritorna, quindi senza questa attesa venivano
+  // nascosta troppo presto, mentre molte texture caricavano ancora in
+  // background (pop-in visibile).
+  await scene.whenReadyAsync(true);
+
   ui.show("hud");
   ui.updateHud({ coins: 0, distance: 0 });
 
@@ -938,7 +956,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     disposeSound(coinSfx);
     disposeSound(coinredSfx);
     disposeSound(soundtrack);
-    disposeModel({ meshes: playerMeshes });
+    disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });
     scene.dispose();
   }
 
