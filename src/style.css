@@ -97,6 +97,13 @@ html, body {
   margin: 0;
 }
 
+/* Il messaggio di auguri può contenere "\n" (parsati come newline reali dal
+   YAML tra doppi apici, vedi wishesMessage in game.config.yaml): senza
+   white-space: pre-line il browser li collasserebbe in un semplice spazio. */
+#wishes-message {
+  white-space: pre-line;
+}
+
 .btn {
   min-width: 12rem;
   padding: 0.9rem 2rem;
