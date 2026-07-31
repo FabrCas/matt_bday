@@ -20,7 +20,7 @@ import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "matt.glb";
-const CHANDELIER_MODEL = "lamp.glb";
+const CHANDELIER_MODEL = "lamp_2.glb";
 
 // Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
 // a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
@@ -72,8 +72,8 @@ const WALL_HEIGHT = 10;
 const LAMP_GAP = 40; // distanza tra un lampadario e il successivo
 const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
-const LAMP_LIGHT_DROP = 0.7; // quanto la point light sta sotto il modello
-const CHANDELIER_SCALE = 1; // tarare in base alle dimensioni reali del modello lamp.glb
+const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
+const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
 const LAMP_INTENSITY = 1;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
@@ -117,9 +117,9 @@ const FOG_COOLDOWN_MAX = 4;
 
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
-const TILE_LEN = 30;
+const TILE_LEN = 35;
 const NUM_TILES = 6;
-const CORRIDOR_HALF_WIDTH = 5.6; // muri/soffitto arrivano esattamente qui
+const CORRIDOR_HALF_WIDTH = 10; // muri/soffitto arrivano esattamente qui
 
 export async function createGameScene({ engine, canvas, goto }) {
   const scene = new Scene(engine);
@@ -357,7 +357,8 @@ export async function createGameScene({ engine, canvas, goto }) {
       false
     );
     const model = rootNodes[0];
-    model.position.set(0, LAMP_BOX_Y, z);
+    model.position.set(0, LAMP_BOX_Y -1 , z);
+    model.rotation.x= Math.PI;
     model.scaling.set(CHANDELIER_SCALE, CHANDELIER_SCALE, CHANDELIER_SCALE);
     if (DEBUG) model.getChildMeshes().forEach((m) => (m.showBoundingBox = true));
     fixImportedMaterials(model.getChildMeshes());
