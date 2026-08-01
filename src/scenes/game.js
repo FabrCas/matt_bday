@@ -5,6 +5,7 @@ import {
   DirectionalLight,
   PointLight,
   MeshBuilder,
+  Mesh,
   StandardMaterial,
   PBRMaterial,
   Color3,
@@ -717,14 +718,78 @@ export async function createGameScene({ engine, canvas, goto }) {
     billboards.push({ left, right });
   }
 
-  // ---- Pool ostacoli e monete ----
-  function makeObstacle(i) {
-    const o = MeshBuilder.CreateBox("obs" + i, { width: 1.4, height: 1.4, depth: 1.4 }, scene);
+  // ---- Tipologie di ostacoli ----
+  // Ognuna definisce come costruire la mesh (colonne = più cubi uniti in
+  // un'unica mesh con Mesh.MergeMeshes, non mesh separate) e l'ingombro da
+  // usare nella collisione: metà larghezza sull'asse X (o "spanAllLanes" se
+  // copre tutte le corsie) e l'altezza oltre la quale il salto la supera.
+  const OBSTACLE_CUBE_SIZE = 1.4;
+  const OBSTACLE_BASE_Y = OBSTACLE_CUBE_SIZE / 2; // centro del cubo poggiato a terra
+
+  function makeCubeObstacleMesh(name) {
+    const o = MeshBuilder.CreateBox(name, { size: OBSTACLE_CUBE_SIZE }, scene);
     o.material = obstacleMat;
-    o.setEnabled(false);
-    if (DEBUG) o.showBoundingBox = true;
-    return { mesh: o, active: false, lane: 0, type: "obstacle" };
+    o.position.y = OBSTACLE_BASE_Y;
+    return o;
   }
+
+  // Colonna verticale: 3 cubi impilati, troppo alta per saltarci sopra —
+  // come un cubo singolo costringe a cambiare corsia, ma rompe la
+  // monotonia visiva di vederne sempre e solo uno identico.
+  function makeColumnVMesh(name) {
+    const parts = [0, 1, 2].map((i) => {
+      const b = MeshBuilder.CreateBox(name + "_p" + i, { size: OBSTACLE_CUBE_SIZE }, scene);
+      b.material = obstacleMat;
+      b.position.y = OBSTACLE_BASE_Y + i * OBSTACLE_CUBE_SIZE;
+      return b;
+    });
+    return Mesh.MergeMeshes(parts, true, true, undefined, false, true);
+  }
+
+  // Colonna orizzontale: 3 cubi affiancati alla stessa altezza di un cubo
+  // singolo (quindi saltabile), ma larga abbastanza da coprire tutte le
+  // corsie — costringe a saltare invece che a cambiare corsia.
+  function makeColumnHMesh(name) {
+    const parts = [-1, 0, 1].map((i) => {
+      const b = MeshBuilder.CreateBox(name + "_p" + i, { size: OBSTACLE_CUBE_SIZE }, scene);
+      b.material = obstacleMat;
+      b.position.set(i * OBSTACLE_CUBE_SIZE, OBSTACLE_BASE_Y, 0);
+      return b;
+    });
+    return Mesh.MergeMeshes(parts, true, true, undefined, false, true);
+  }
+
+  // "weight" pesa la probabilità di scelta in pickObstacleType(): il cubo
+  // semplice resta il più comune, le colonne sono varianti più rare, per
+  // dare varietà senza rendere il percorso irriconoscibile.
+  const OBSTACLE_TYPES = [
+    { id: "cube", weight: 5, poolSize: 8, build: makeCubeObstacleMesh, collisionHalfWidth: 1.0, jumpClearY: 1.6, spanAllLanes: false },
+    { id: "columnV", weight: 1, poolSize: 3, build: makeColumnVMesh, collisionHalfWidth: 1.0, jumpClearY: WALL_HEIGHT, spanAllLanes: false },
+    { id: "columnH", weight: 1, poolSize: 3, build: makeColumnHMesh, collisionHalfWidth: 1.0, jumpClearY: 1.6, spanAllLanes: true },
+  ];
+  const OBSTACLE_TYPE_TOTAL_WEIGHT = OBSTACLE_TYPES.reduce((sum, t) => sum + t.weight, 0);
+  function pickObstacleType() {
+    let r = Math.random() * OBSTACLE_TYPE_TOTAL_WEIGHT;
+    for (const t of OBSTACLE_TYPES) {
+      if (r < t.weight) return t;
+      r -= t.weight;
+    }
+    return OBSTACLE_TYPES[0];
+  }
+
+  // ---- Pool ostacoli (uno per tipo, geometrie diverse non riassegnabili
+  // come invece si fa col materiale delle monete) e monete ----
+  const obstaclesByType = {};
+  for (const t of OBSTACLE_TYPES) {
+    obstaclesByType[t.id] = Array.from({ length: t.poolSize }, (_, i) => {
+      const mesh = t.build(`obs_${t.id}${i}`);
+      mesh.setEnabled(false);
+      if (DEBUG) mesh.showBoundingBox = true;
+      return { mesh, active: false, lane: 0, obstacleType: t };
+    });
+  }
+  const obstacles = Object.values(obstaclesByType).flat(); // scorrimento/riciclo unico in update()
+
   function makeCoin(i) {
     const c = MeshBuilder.CreateCylinder("coin" + i, { diameter: 0.8, height: 0.12, tessellation: 16 }, scene);
     c.material = coinMat;
@@ -737,8 +802,6 @@ export async function createGameScene({ engine, canvas, goto }) {
     return { mesh: c, active: false, lane: 0, type: "coin", value: 1 };
   }
 
-
-  const obstacles = Array.from({ length: 12 }, (_, i) => makeObstacle(i));
   const coins = Array.from({ length: 24 }, (_, i) => makeCoin(i));
 
   function spawnFrom(pool) {
@@ -759,25 +822,47 @@ export async function createGameScene({ engine, canvas, goto }) {
     grounded: true,
     nextSpawnZ: SPAWN_AHEAD,
     fogTime: 0, // orologio indipendente dalla velocità, per il moto dei banchi di nebbia
+    quietRowsRemaining: 0, // >0: righe senza spawn ancora da consumare, vedi spawnRow()
   };
 
   function spawnRow() {
-    // Sceglie una corsia libera per l'ostacolo; monete su una corsia diversa.
-    const obsLane = Math.floor(Math.random() * 3);
-    const ob = spawnFrom(obstacles);
-    if (ob) {
-      ob.active = true;
-      ob.lane = obsLane;
-      ob.mesh.setEnabled(true);
-      ob.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
-      ob.mesh.position.set(LANES[obsLane], 0.7, state.nextSpawnZ);
+    // Pause brevi e periodiche senza alcuno spawn: danno respiro al ritmo di
+    // gioco invece di un flusso costante e ripetitivo di ostacoli/monete.
+    if (state.quietRowsRemaining > 0) {
+      state.quietRowsRemaining -= 1;
+      state.nextSpawnZ += ROW_GAP;
+      return;
+    }
+    if (Math.random() < G.quietStretchChance) {
+      state.quietRowsRemaining =
+        G.quietStretchMinRows + Math.floor(Math.random() * (G.quietStretchMaxRows - G.quietStretchMinRows + 1));
+      state.nextSpawnZ += ROW_GAP;
+      return;
     }
 
-    // Fila di monete su una corsia diversa (a volte).
+    // Corsia scelta comunque (serve a tenere le monete su una corsia
+    // diversa anche nelle righe senza ostacolo): l'ostacolo stesso non è più
+    // garantito ad ogni riga, per rompere la regolarità "uno ogni ROW_GAP".
+    const obsLane = Math.floor(Math.random() * 3);
+    if (Math.random() < G.obstacleSpawnChance) {
+      const obsType = pickObstacleType();
+      const ob = spawnFrom(obstaclesByType[obsType.id]);
+      if (ob) {
+        ob.active = true;
+        ob.lane = obsLane;
+        ob.mesh.setEnabled(true);
+        ob.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
+        ob.mesh.position.x = LANES[obsLane];
+        ob.mesh.position.z = state.nextSpawnZ;
+      }
+    }
+
+    // Fila di monete su una corsia diversa (a volte), lunghezza variabile
+    // (1..coinRowLength) invece di sempre la stessa, per varietà.
     if (Math.random() < G.coinSpawnChance) {
       let coinLane = Math.floor(Math.random() * 3);
       if (coinLane === obsLane) coinLane = (coinLane + 1) % 3;
-      const count = G.coinRowLength;
+      const count = 1 + Math.floor(Math.random() * G.coinRowLength);
       for (let k = 0; k < count; k++) {
         const co = spawnFrom(coins);
         if (!co) break;
@@ -1080,12 +1165,16 @@ export async function createGameScene({ engine, canvas, goto }) {
       ob.mesh.position.z -= move;
       // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
       ob.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - ob.mesh.position.z) / FADE_DISTANCE));
-      // Collisione: vicino in z, stessa corsia, player non abbastanza in alto.
+      // Collisione: vicino in z, stessa corsia (o tutte, per i tipi che
+      // coprono l'intera larghezza), player non abbastanza in alto da
+      // superarla saltando (soglia specifica del tipo di ostacolo).
+      const t = ob.obstacleType;
+      const laneHit = t.spanAllLanes || Math.abs(ob.mesh.position.x - px) < t.collisionHalfWidth;
       if (
         state.invulnerableTimer <= 0 &&
         Math.abs(ob.mesh.position.z) < 0.9 &&
-        Math.abs(ob.mesh.position.x - px) < 1.0 &&
-        py < 1.6
+        laneHit &&
+        py < t.jumpClearY
       ) {
         hitObstacle(ob);
         if (!state.running) return;

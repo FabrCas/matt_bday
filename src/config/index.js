@@ -47,6 +47,10 @@ const defaults = {
     coinSpawnChance: 0.8,
     redCoinChance: 0.03,   // probabilità (0..1) che una fila generi una moneta rossa bonus
     redCoinValueMultiplier: 10, // valore della moneta rossa = coinValue * questo fattore
+    obstacleSpawnChance: 0.85, // probabilità (0..1) che una riga generi un ostacolo
+    quietStretchChance: 0.05,  // probabilità per riga di avviare una pausa senza spawn
+    quietStretchMinRows: 2,
+    quietStretchMaxRows: 4,
   },
 };
 
