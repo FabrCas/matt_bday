@@ -29,7 +29,8 @@ const BILLBOARD_IMAGES = CONFIG.billboards.images.length ? CONFIG.billboards.ima
 
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
-const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png"];
+// const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png", "ghost_max.png"];
+const FOG_TEXTURES = ["ghost_max.png"];
 const JUMP_SOUNDS = [
   "salto base 1.mp3",
   "salto base 2.mp3",
@@ -339,6 +340,11 @@ export async function createGameScene({ engine, canvas, goto }) {
     soundtrack = s;
   });
 
+  let soundghostmax = null;
+  loadSound("crying_ghot_max.mp3", { volume: 0.7 , loop: false}).then((s) => {
+    soundghostmax = s;
+  });
+
   // Un suono di salto scelto a caso tra JUMP_SOUNDS ad ogni salto (vedi
   // jump() più sotto), invece di ripetere sempre lo stesso file.
   const jumpSfx = [];
@@ -550,7 +556,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     mat.specularColor = new Color3(0, 0, 0);
     mat.disableLighting = true;
     mat.backFaceCulling = false;
-    return { material: mat, texture: tex, uSpeed: 0.02 + idx * 0.01, vSpeed: 0.015 + idx * 0.008 };
+    return { material: mat, texture: tex, uSpeed: 0.02 + idx * 0.01, vSpeed: 0.015 + idx * 0.008, file: file};
   });
 
   const fogWisp = MeshBuilder.CreatePlane(
@@ -575,6 +581,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   function spawnFogWisp() {
     const dir = Math.random() < 0.5 ? 1 : -1; // sinistra→destra o il contrario, a caso
     fogState.mat = fogMats[Math.floor(Math.random() * fogMats.length)];
+
+    if (fogState.mat.file == "ghost_max.png"){
+      setTimeout(() => {
+        soundghostmax?.play();
+      }, 1000);
+      
+      
+    } 
+
     fogWisp.material = fogState.mat.material;
     // Distanza casuale (non più fissa) tra FOG_WALL_Z_MIN e FOG_WALL_Z_MAX:
     // il tragitto orizzontale va ricalcolato di conseguenza, dato che dipende
