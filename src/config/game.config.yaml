@@ -21,6 +21,14 @@ game:
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
   wishesMessage: "Vittoria sbloccata!\nHai superato la prova, ora puoi accedere al Boss Finale:\nscegliere come spendere la tua ricompensa.\nBuon compleanno, dottore!"
 
+# --- Scena Menu ---
+menu:
+  logoWidth: 3.5           # larghezza del piano del logo (unità di mondo)
+  # Altezza del piano = altezza visibile a schermo (a quella distanza dalla
+  # camera) moltiplicata per questo fattore: 1 = occupa tutta la visuale in
+  # verticale, <1 lascia un margine sopra/sotto.
+  logoHeightScale: 1
+
 # --- Scena Auguri ---
 wishes:
   galleryPlaneCount: 10    # numero di piani quadrati che orbitano intorno al testo

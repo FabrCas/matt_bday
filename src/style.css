@@ -70,6 +70,13 @@ html, body {
   backdrop-filter: none;
 }
 
+/* Stesso problema del menu: il piano del logo occupa gran parte della vista
+   3D dietro l'overlay, e il "backdrop-filter: blur" lo sfocava. */
+#menu {
+  background: none;
+  backdrop-filter: none;
+}
+
 .hidden {
   display: none !important;
 }
