@@ -49,6 +49,7 @@ const LANES = G.lanes; // posizioni x delle 3 corsie
 const LANE_LERP = G.laneChangeSpeed; // velocità di cambio corsia
 const GRAVITY = G.gravity;
 const JUMP_SPEED = G.jumpSpeed;
+const FAST_FALL_SPEED = G.fastFallSpeed; // velocità (positiva, applicata verso il basso) del comando "giù" in salto
 const START_SPEED = G.startSpeed; // unità/s in avanti (mondo che scorre)
 const MAX_SPEED = G.maxSpeed;
 const ACCEL = G.acceleration; // incremento velocità nel tempo
@@ -114,7 +115,34 @@ const FOG_CROSS_DURATION_MAX = 15;
 const FOG_EDGE_FADE = 0.15; // frazione iniziale/finale del tragitto dedicata alla dissolvenza
 const FOG_COOLDOWN_MIN = 1.5; // pausa tra un velo e il successivo
 const FOG_COOLDOWN_MAX = 4;
-
+const FOG_LINEAR_RANGE = 40;
+// ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
+// Ogni "coppia" (sx+dx) mostra sempre la stessa immagine, pescata a caso dal
+// pool di CONFIG.billboards.images con un sistema "bag" (stile Tetris): le
+// immagini non si ripetono finché non sono uscite tutte, poi il sacchetto
+// viene rimescolato e si ricomincia.
+const BILLBOARD_WALL_GAP = 0.05; // piccolo margine tra il bordo del cartellone e il muro
+const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
+const BILLBOARD_GAP = 70; // distanza tra una coppia di cartelloni e la successiva
+const BILLBOARD_PAIR_COUNT = CONFIG.billboards.count; // coppie sx/dx attive contemporaneamente
+// Dimensioni "landscape" (larghezza > altezza) di riferimento: per le
+// immagini portrait (più alte che larghe) vengono scambiate, vedi
+// billboardIsPortrait/billboardSize più sotto, così il cartellone non
+// risulta mai stirato rispetto alle proporzioni reali dell'immagine.
+const BILLBOARD_WIDTH = 5;
+const BILLBOARD_HEIGHT = 3;
+// Angolate leggermente verso chi arriva (come i cartelloni pubblicitari
+// veri lungo una strada), invece di stare di taglio a 90° rispetto al
+// corridoio: a 90° la faccia frontale è rivolta solo verso il centro
+// strada e risulta visibile quasi di striscio finché il player non è
+// praticamente affiancato. Riducendo l'angolo si guadagna un componente
+// rivolta all'indietro (verso la telecamera in arrivo), quindi il
+// cartellone si "apre" verso l'inquadratura molto prima, restando
+// leggibile per un tratto più lungo.
+const BILLBOARD_TILT = Math.PI / 6; // 30°
+const FRAME_MARGIN = 0.3; // sporgenza del bordo rispetto all'immagine
+const FRAME_THICKNESS = 0.08;
+const FRAME_OFFSET = FRAME_THICKNESS / 2 + 0.02; // dietro l'immagine, verso il muro
 
 // ---- Dimensioni del corridoio (condivise da pavimento, muri, soffitto e billboard) ----
 const TILE_LEN = 30;
@@ -131,7 +159,6 @@ export async function createGameScene({ engine, canvas, goto }) {
   // Copre così anche le distanze a cui muri/billboard/lampadari vengono
   // riciclati (~90-110), nascondendone il pop-in, e si fonde con lo sfondo
   // nero (fogColor = clearColor) invece di lasciare un "muro" visibile.
-  const FOG_LINEAR_RANGE = 40;
   scene.fogMode = Scene.FOGMODE_LINEAR;
   scene.fogColor = new Color3(0, 0, 0);
   scene.fogStart = SPAWN_AHEAD;
@@ -460,31 +487,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     fogWisp.setEnabled(true);
   }
 
-  // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
-  // Ogni "coppia" (sx+dx) mostra sempre la stessa immagine, pescata a caso dal
-  // pool di CONFIG.billboards.images con un sistema "bag" (stile Tetris): le
-  // immagini non si ripetono finché non sono uscite tutte, poi il sacchetto
-  // viene rimescolato e si ricomincia.
-  const BILLBOARD_WALL_GAP = 0.05; // piccolo margine tra il bordo del cartellone e il muro
-  const BILLBOARD_Y = WALL_HEIGHT/2; // altezza da terra
-  const BILLBOARD_GAP = 70; // distanza tra una coppia di cartelloni e la successiva
-  const BILLBOARD_PAIR_COUNT = CONFIG.billboards.count; // coppie sx/dx attive contemporaneamente
-  // Dimensioni "landscape" (larghezza > altezza) di riferimento: per le
-  // immagini portrait (più alte che larghe) vengono scambiate, vedi
-  // billboardIsPortrait/billboardSize più sotto, così il cartellone non
-  // risulta mai stirato rispetto alle proporzioni reali dell'immagine.
-  const BILLBOARD_WIDTH = 5;
-  const BILLBOARD_HEIGHT = 3;
-  // Angolate leggermente verso chi arriva (come i cartelloni pubblicitari
-  // veri lungo una strada), invece di stare di taglio a 90° rispetto al
-  // corridoio: a 90° la faccia frontale è rivolta solo verso il centro
-  // strada e risulta visibile quasi di striscio finché il player non è
-  // praticamente affiancato. Riducendo l'angolo si guadagna un componente
-  // rivolta all'indietro (verso la telecamera in arrivo), quindi il
-  // cartellone si "apre" verso l'inquadratura molto prima, restando
-  // leggibile per un tratto più lungo.
-  const BILLBOARD_TILT = Math.PI / 6; // 30°
-
+  
   // Orientamento reale di ciascuna immagine (portrait/landscape), letto una
   // sola volta all'avvio dalle dimensioni naturali del file — non deducibile
   // dal nome. Va risolto prima di creare i piani, perché determina se usare
@@ -540,9 +543,6 @@ export async function createGameScene({ engine, canvas, goto }) {
   // Cornice bianca dietro ogni cartellone (effetto "quadro incorniciato").
   // Bianco puro e non influenzato dalle luci di scena (disableLighting),
   // così resta uniforme indipendentemente da normali/angolo della luce.
-  const FRAME_MARGIN = 0.3; // sporgenza del bordo rispetto all'immagine
-  const FRAME_THICKNESS = 0.08;
-  const FRAME_OFFSET = FRAME_THICKNESS / 2 + 0.02; // dietro l'immagine, verso il muro
   const billboardFrameMat = new StandardMaterial("billboardFrameMat", scene);
   billboardFrameMat.diffuseColor = new Color3(1, 1, 1);
   billboardFrameMat.specularColor = new Color3(1, 1, 1);
@@ -721,6 +721,14 @@ export async function createGameScene({ engine, canvas, goto }) {
       state.grounded = false;
     }
   }
+  // Discesa rapida: solo mentre si è in aria (in salto), forza una velocità
+  // verticale negativa marcata così il player torna a terra molto più
+  // velocemente di quanto farebbe la sola gravità. Da terra non ha effetto.
+  function fastFall() {
+    if (!state.grounded) {
+      state.velY = -FAST_FALL_SPEED;
+    }
+  }
 
   function onKey(e) {
     if (!state.running) return;
@@ -740,6 +748,11 @@ export async function createGameScene({ engine, canvas, goto }) {
       case "W":
       case " ":
         jump();
+        break;
+      case "ArrowDown":
+      case "s":
+      case "S":
+        fastFall();
         break;
     }
   }
@@ -764,6 +777,8 @@ export async function createGameScene({ engine, canvas, goto }) {
       changeLane(dx > 0 ? 1 : -1);
     } else if (dy < 0) {
       jump(); // swipe su = salto
+    } else {
+      fastFall(); // swipe giù = discesa rapida (solo se già in salto)
     }
     touchStart = null;
   }

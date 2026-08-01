@@ -54,6 +54,7 @@ gameplay:
   laneChangeSpeed: 12     # rapidità di cambio corsia
   jumpSpeed: 9            # spinta del salto
   gravity: -22            # gravità applicata in aria
+  fastFallSpeed: 10       # velocità di discesa forzata col comando "giù" durante il salto
   spawnAhead: 70          # distanza a cui vengono generati gli oggetti
   rowGap: 9               # distanza tra righe di ostacoli/monete
   coinRowLength: 3        # numero di monete per fila

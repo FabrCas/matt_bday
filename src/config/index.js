@@ -32,6 +32,7 @@ const defaults = {
     laneChangeSpeed: 12,
     jumpSpeed: 9,
     gravity: -22,
+    fastFallSpeed: 26, // velocità di discesa forzata col comando "giù" durante il salto
     spawnAhead: 70,
     rowGap: 9,
     coinRowLength: 3,
