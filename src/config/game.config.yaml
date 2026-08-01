@@ -7,7 +7,7 @@
 # --- Debug ---
 # Se true, mostra a schermo l'hitbox (bounding box) di tutti gli oggetti
 # di gioco (player, ostacoli, monete), utile per calibrare le collisioni.
-debug: true
+debug: false
 
 # --- Testi / branding ---
 game:
@@ -23,7 +23,7 @@ game:
 
 # --- Scena Menu ---
 menu:
-  logoWidth: 8.5           # larghezza del piano del logo (unità di mondo)
+  logoWidth: 5           # larghezza del piano del logo (unità di mondo)
   # Altezza del piano = altezza visibile a schermo (a quella distanza dalla
   # camera) moltiplicata per questo fattore. Il piano resta ancorato al
   # bordo SUPERIORE dello schermo (non centrato): 0.6 = occupa la fascia
