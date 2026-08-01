@@ -23,11 +23,11 @@ game:
 
 # --- Scena Menu ---
 menu:
-  logoWidth: 3.5           # larghezza del piano del logo (unità di mondo)
+  logoWidth: 8.5           # larghezza del piano del logo (unità di mondo)
   # Altezza del piano = altezza visibile a schermo (a quella distanza dalla
   # camera) moltiplicata per questo fattore: 1 = occupa tutta la visuale in
   # verticale, <1 lascia un margine sopra/sotto.
-  logoHeightScale: 1
+  logoHeightScale: 1.
 
 # --- Scena Auguri ---
 wishes:

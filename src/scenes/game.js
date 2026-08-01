@@ -336,6 +336,11 @@ export async function createGameScene({ engine, canvas, goto }) {
     coinredSfx = s;
   });
 
+  let hurtsfx = null;
+  loadSound("hurt.mp3", { volume: 0.8 }).then((s) => {
+    hurtsfx = s;
+  });
+
   let soundtrack = null;
   loadSound("soundtrack_game.mp3", { volume: 0.6 , loop: true}).then((s) => {
     soundtrack = s;
@@ -1106,6 +1111,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     ob.active = false;
     ob.mesh.setEnabled(false);
     state.invulnerableTimer = HIT_INVULN_TIME;
+    hurtsfx?.play();
     state.lives -= 1;
     ui.flashHit();
     if (state.lives <= 0) {
