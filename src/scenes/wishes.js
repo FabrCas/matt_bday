@@ -13,6 +13,7 @@ import * as ui from "../ui/ui.js";
 import { getCameraProfile_menu } from "../utils/responsive.js";
 import { loadTexture } from "../utils/textureLoader.js";
 import { CONFIG } from "../config/index.js";
+import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Numero di piani quadrati che orbitano intorno al testo (configurabile in
 // game.config.yaml, sezione `wishes.galleryPlaneCount`).
@@ -75,6 +76,11 @@ export async function createWishesScene({ engine }) {
   const light = new HemisphericLight("wishesLight", new Vector3(0.2, 1, 0.3), scene);
   light.intensity = 0.9;
 
+  let soundwishes = null;
+  loadSound("wishes_sound.mp3", { volume: 0.7 , loop: false}).then((s) => {
+    soundwishes = s;
+  });
+
   // ---- Piani orbitanti intorno al centro (stesso punto dove è centrato il
   // testo HTML, in precedenza occupato dalla "gem" decorativa).
   const GALLERY_CENTER = new Vector3(0, 1, 0);
@@ -125,6 +131,7 @@ export async function createWishesScene({ engine }) {
   }
   positionGallery();
 
+
   // `goto()` in main.js mostra la schermata "loading" prima di chiamare questa
   // factory e la nasconde solo quando la promise ritornata si risolve: qui
   // aspettiamo che texture/materiali/mesh siano tutti pronti (incluse le
@@ -134,6 +141,7 @@ export async function createWishesScene({ engine }) {
 
   ui.show("wishes");
   ui.updateWishes();
+  soundwishes?.play();
 
   function update(dt) {
     orbitAngle += dt * GALLERY_ROTATION_SPEED;

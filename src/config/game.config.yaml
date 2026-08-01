@@ -11,7 +11,7 @@ debug: true
 
 # --- Testi / branding ---
 game:
-  title: "Matt Run"
+  title: "Glanis Run"
   subtitle: "Guadagnati il regalo raccogliendo le monete!"
   # Se false, nella schermata di game over non compare il bottone "rigioca"
   # (es. per disattivare i replay dopo l'evento).
