@@ -73,6 +73,7 @@ const LANES = G.lanes; // posizioni x delle 3 corsie
 const LANE_LERP = G.laneChangeSpeed; // velocità di cambio corsia
 const GRAVITY = G.gravity;
 const JUMP_SPEED = G.jumpSpeed;
+const MAX_JUMPS = G.maxJumps; // salti consentiti prima di ritoccare terra (2 = doppio salto)
 const FAST_FALL_SPEED = G.fastFallSpeed; // velocità (positiva, applicata verso il basso) del comando "giù" in salto
 const START_SPEED = G.startSpeed; // unità/s in avanti (mondo che scorre)
 const MAX_SPEED = G.maxSpeed;
@@ -877,9 +878,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     { id: "wall2", weight: 2, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 2), laneSpan: 2, jumpClearY: 1.6 },
     { id: "wall3", weight: 1, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 3), laneSpan: 3, jumpClearY: 1.6 },
   ].map((t) => ({ ...t, collisionHalfWidth: (t.laneSpan * LANE_GAP) / 2 }));
-  const OBSTACLE_TYPE_TOTAL_WEIGHT = OBSTACLE_TYPES.reduce((sum, t) => sum + t.weight, 0);
+
   function pickObstacleType() {
-    let r = Math.random() * OBSTACLE_TYPE_TOTAL_WEIGHT;
+    const totalWeight = OBSTACLE_TYPES.reduce((sum, t) => sum + t.weight, 0);
+    let r = Math.random() * totalWeight;
     for (const t of OBSTACLE_TYPES) {
       if (r < t.weight) return t;
       r -= t.weight;
@@ -930,6 +932,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     targetX: LANES[1],
     velY: 0,
     grounded: true,
+    jumpsUsed: 0, // salti già effettuati da quando si è lasciato il suolo (vedi jump()/MAX_JUMPS)
     nextSpawnZ: SPAWN_AHEAD,
     fogTime: 0, // orologio indipendente dalla velocità, per il moto dei banchi di nebbia
     quietRowsRemaining: 0, // >0: righe senza spawn ancora da consumare, vedi spawnRow()
@@ -1029,10 +1032,15 @@ export async function createGameScene({ engine, canvas, goto }) {
     state.laneIndex = Math.max(0, Math.min(2, state.laneIndex + dir));
     state.targetX = LANES[state.laneIndex];
   }
+  // Doppio salto: consentito anche a mezz'aria finché non si sono esauriti
+  // MAX_JUMPS salti dall'ultimo contatto col suolo (azzerati all'atterraggio,
+  // vedi update()). Ogni salto riparte da JUMP_SPEED, indipendentemente
+  // dalla velocità verticale residua del salto precedente.
   function jump() {
-    if (state.grounded) {
+    if (state.jumpsUsed < MAX_JUMPS) {
       state.velY = JUMP_SPEED;
       state.grounded = false;
+      state.jumpsUsed += 1;
       if (jumpSfx.length) {
         jumpSfx[Math.floor(Math.random() * jumpSfx.length)]?.play();
       }
@@ -1174,6 +1182,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         player.position.y = 0.8;
         state.velY = 0;
         state.grounded = true;
+        state.jumpsUsed = 0;
       }
     }
 

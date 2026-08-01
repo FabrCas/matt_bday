@@ -39,6 +39,7 @@ const defaults = {
     acceleration: 0.35,
     laneChangeSpeed: 12,
     jumpSpeed: 9,
+    maxJumps: 2, // salti consentibili prima di ritoccare terra (2 = doppio salto)
     gravity: -22,
     fastFallSpeed: 26, // velocità di discesa forzata col comando "giù" durante il salto
     spawnAhead: 70,

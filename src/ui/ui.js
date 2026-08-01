@@ -25,6 +25,8 @@ const els = {
   wishesMessage: document.getElementById("wishes-message"),
   hitFlash: document.getElementById("hit-flash"),
   controlsCountdown: document.getElementById("controls-countdown"),
+  controlsLives: document.getElementById("controls-lives"),
+  controlsCoinMultiplier: document.getElementById("controls-coin-multiplier"),
 };
 
 // Applica titolo/sottotitolo dalla config statica (una volta all'avvio).
@@ -63,6 +65,13 @@ export function updateWishes() {
 // Secondi rimanenti prima del passaggio automatico al gioco (vedi controls.js).
 export function updateControlsCountdown(secondsLeft) {
   els.controlsCountdown.textContent = Math.ceil(secondsLeft);
+}
+
+// Vite e moltiplicatore della moneta rossa letti dalla config statica, non
+// scritti a mano nell'HTML: restano sempre allineati ai valori reali di gioco.
+export function updateControlsInfo() {
+  els.controlsLives.textContent = CONFIG.game.lives;
+  els.controlsCoinMultiplier.textContent = CONFIG.gameplay.redCoinValueMultiplier;
 }
 
 // Flash rosso a schermo intero al momento di un colpo (vedi hitObstacle() in

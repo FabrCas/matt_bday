@@ -24,6 +24,7 @@ export function createControlsScene({ engine, goto }) {
   light.intensity = 0.9;
 
   ui.show("controls");
+  ui.updateControlsInfo();
 
   let elapsed = 0;
   let advancing = false; // guardia: evita chiamate goto() multiple se update() gira ancora un frame di troppo
