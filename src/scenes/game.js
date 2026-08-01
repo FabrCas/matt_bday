@@ -792,15 +792,17 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // ---- Tipologie di ostacoli ----
-  // Ognuna definisce come costruire la mesh (colonne = più cubi uniti in
-  // ogni cubo, mesh figlie di un nodo radice "vuoto" — non con
-  // Mesh.MergeMeshes, che ricentra i vertici sul primo elemento
-  // dell'array anziché conservarne le posizioni assolute, spostando/
-  // affondando la geometria in modo imprevedibile) e l'ingombro da usare
-  // nella collisione: metà larghezza sull'asse X (o "spanAllLanes" se
-  // copre tutte le corsie) e l'altezza oltre la quale il salto la supera.
+  // Ognuna definisce come costruire la mesh (i blocchi multi-corsia sono un
+  // nodo radice "vuoto" con più cubi figli — non Mesh.MergeMeshes, che
+  // ricentra i vertici sul primo elemento dell'array anziché conservarne le
+  // posizioni assolute, spostando/affondando la geometria in modo
+  // imprevedibile), quante corsie contigue occupa (laneSpan) e l'altezza
+  // oltre la quale il salto lo supera. L'ingombro usato in collisione
+  // (collisionHalfWidth) è calcolato da laneSpan, non specificato a mano:
+  // così collisione e geometria visibile non possono mai disallinearsi.
   const OBSTACLE_CUBE_SIZE = 1.4;
   const OBSTACLE_BASE_Y = OBSTACLE_CUBE_SIZE / 2; // centro del cubo poggiato a terra
+  const LANE_GAP = LANES[1] - LANES[0]; // distanza tra corsie adiacenti (uniforme)
 
   function makeCubeObstacleMesh(name) {
     const o = MeshBuilder.CreateBox(name, { size: OBSTACLE_CUBE_SIZE }, scene);
@@ -812,14 +814,14 @@ export async function createGameScene({ engine, canvas, goto }) {
   // Nodo radice senza geometria propria: sposteremo solo lui (x/z) per far
   // scorrere/riposizionare l'ostacolo, i cubi figli restano fissi nelle loro
   // posizioni locali (root.position.y resta sempre 0).
-  function makeCubeGroup(name, offsets) {
+  function makeCubeGroup(name, boxes) {
     const root = new Mesh(name, scene);
-    for (const [i, [ox, oy, oz]] of offsets.entries()) {
-      const b = MeshBuilder.CreateBox(name + "_p" + i, { size: OBSTACLE_CUBE_SIZE }, scene);
+    boxes.forEach(({ width, height, depth, x, y, z }, i) => {
+      const b = MeshBuilder.CreateBox(name + "_p" + i, { width, height, depth }, scene);
       b.material = obstacleMat;
       b.parent = root;
-      b.position.set(ox, oy, oz);
-    }
+      b.position.set(x, y, z);
+    });
     return root;
   }
 
@@ -829,28 +831,47 @@ export async function createGameScene({ engine, canvas, goto }) {
   function makeColumnVMesh(name) {
     return makeCubeGroup(
       name,
-      [0, 1, 2].map((i) => [0, OBSTACLE_BASE_Y + i * OBSTACLE_CUBE_SIZE, 0])
+      [0, 1, 2].map((i) => ({
+        width: OBSTACLE_CUBE_SIZE,
+        height: OBSTACLE_CUBE_SIZE,
+        depth: OBSTACLE_CUBE_SIZE,
+        x: 0,
+        y: OBSTACLE_BASE_Y + i * OBSTACLE_CUBE_SIZE,
+        z: 0,
+      }))
     );
   }
 
-  // Colonna orizzontale: 3 cubi affiancati alla stessa altezza di un cubo
-  // singolo (quindi saltabile), ma larga abbastanza da coprire tutte le
-  // corsie — costringe a saltare invece che a cambiare corsia.
-  function makeColumnHMesh(name) {
+  // Blocco orizzontale di `laneSpan` corsie contigue, stessa altezza di un
+  // cubo singolo (quindi saltabile): ogni segmento è largo esattamente
+  // quanto una corsia (LANE_GAP, non OBSTACLE_CUBE_SIZE) così i segmenti si
+  // toccano ai margini di corsia senza buchi e senza sporgere solo a metà
+  // sulle corsie esterne — prima, con segmenti più stretti dei cubi
+  // standard, il blocco non copriva davvero fino in fondo le corsie di
+  // destra/sinistra.
+  function makeHorizontalSpanMesh(name, laneSpan) {
     return makeCubeGroup(
       name,
-      [-1, 0, 1].map((i) => [i * OBSTACLE_CUBE_SIZE, OBSTACLE_BASE_Y, 0])
+      Array.from({ length: laneSpan }, (_, i) => ({
+        width: LANE_GAP,
+        height: OBSTACLE_CUBE_SIZE,
+        depth: OBSTACLE_CUBE_SIZE,
+        x: (i - (laneSpan - 1) / 2) * LANE_GAP,
+        y: OBSTACLE_BASE_Y,
+        z: 0,
+      }))
     );
   }
 
   // "weight" pesa la probabilità di scelta in pickObstacleType(): il cubo
-  // semplice resta il più comune, le colonne sono varianti più rare, per
-  // dare varietà senza rendere il percorso irriconoscibile.
+  // semplice resta il più comune, le varianti più larghe/alte sono rare, per
+  // dare varietà senza rendere il percorso irriconoscibile o troppo punitivo.
   const OBSTACLE_TYPES = [
-    { id: "cube", weight: 5, poolSize: 8, build: makeCubeObstacleMesh, collisionHalfWidth: 1.0, jumpClearY: 1.6, spanAllLanes: false },
-    { id: "columnV", weight: 1, poolSize: 3, build: makeColumnVMesh, collisionHalfWidth: 1.0, jumpClearY: WALL_HEIGHT, spanAllLanes: false },
-    { id: "columnH", weight: 1, poolSize: 3, build: makeColumnHMesh, collisionHalfWidth: 1.0, jumpClearY: 1.6, spanAllLanes: true },
-  ];
+    { id: "cube", weight: 5, poolSize: 8, build: makeCubeObstacleMesh, laneSpan: 1, jumpClearY: 1.6 },
+    { id: "columnV", weight: 1, poolSize: 3, build: makeColumnVMesh, laneSpan: 1, jumpClearY: WALL_HEIGHT },
+    { id: "wall2", weight: 2, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 2), laneSpan: 2, jumpClearY: 1.6 },
+    { id: "wall3", weight: 1, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 3), laneSpan: 3, jumpClearY: 1.6 },
+  ].map((t) => ({ ...t, collisionHalfWidth: (t.laneSpan * LANE_GAP) / 2 }));
   const OBSTACLE_TYPE_TOTAL_WEIGHT = OBSTACLE_TYPES.reduce((sum, t) => sum + t.weight, 0);
   function pickObstacleType() {
     let r = Math.random() * OBSTACLE_TYPE_TOTAL_WEIGHT;
@@ -924,33 +945,43 @@ export async function createGameScene({ engine, canvas, goto }) {
       return;
     }
 
-    // Corsia scelta comunque (serve a tenere le monete su una corsia
-    // diversa anche nelle righe senza ostacolo): l'ostacolo stesso non è più
-    // garantito ad ogni riga, per rompere la regolarità "uno ogni ROW_GAP".
-    const obsLane = Math.floor(Math.random() * 3);
+    // Tipo e corsia di partenza scelti comunque (servono a tenere le monete
+    // fuori dalle corsie coperte anche nelle righe senza ostacolo attivo):
+    // l'ostacolo stesso non è più garantito ad ogni riga, per rompere la
+    // regolarità "uno ogni ROW_GAP". La corsia di partenza è vincolata a far
+    // stare tutte le laneSpan corsie del blocco dentro 0..2 (es. laneSpan=2
+    // può iniziare solo su corsia 0 o 1, laneSpan=3 solo su 0).
+    const obsType = pickObstacleType();
+    const maxStartLane = 3 - obsType.laneSpan;
+    const startLane = Math.floor(Math.random() * (maxStartLane + 1));
+    const coveredLanes = Array.from({ length: obsType.laneSpan }, (_, k) => startLane + k);
+    const obsCenterX = (LANES[startLane] + LANES[startLane + obsType.laneSpan - 1]) / 2;
+
     if (Math.random() < G.obstacleSpawnChance) {
-      const obsType = pickObstacleType();
       const ob = spawnFrom(obstaclesByType[obsType.id]);
       if (ob) {
         ob.active = true;
-        ob.lane = obsLane;
+        ob.lane = startLane;
         ob.mesh.setEnabled(true);
         ob.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
-        // I tipi "spanAllLanes" vanno sempre centrati (x=0): la collisione
-        // li considera comunque un blocco su tutte e 3 le corsie, quindi
-        // devono anche visivamente coprirle simmetricamente — su una corsia
-        // casuale coprirebbero solo 2 corsie lasciandone una scoperta pur
-        // colpendo comunque chi ci passa (esattamente il bug segnalato).
-        ob.mesh.position.x = obsType.spanAllLanes ? 0 : LANES[obsLane];
+        ob.mesh.position.x = obsCenterX;
         ob.mesh.position.z = state.nextSpawnZ;
       }
     }
 
-    // Fila di monete su una corsia diversa (a volte), lunghezza variabile
+    // Corsie libere (non coperte dall'ostacolo di questa riga): monete e
+    // moneta bonus vanno sempre su una di queste, mai su una corsia bloccata.
+    const freeLanes = [0, 1, 2].filter((l) => !coveredLanes.includes(l));
+    function pickFreeLane() {
+      return freeLanes.length
+        ? freeLanes[Math.floor(Math.random() * freeLanes.length)]
+        : Math.floor(Math.random() * 3); // blocco a 3 corsie: nessuna libera, va comunque saltato
+    }
+
+    // Fila di monete su una corsia libera (a volte), lunghezza variabile
     // (1..coinRowLength) invece di sempre la stessa, per varietà.
     if (Math.random() < G.coinSpawnChance) {
-      let coinLane = Math.floor(Math.random() * 3);
-      if (coinLane === obsLane) coinLane = (coinLane + 1) % 3;
+      const coinLane = pickFreeLane();
       const count = 1 + Math.floor(Math.random() * G.coinRowLength);
       for (let k = 0; k < count; k++) {
         const co = spawnFrom(coins);
@@ -968,8 +999,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     // Moneta bonus rara, indipendente dalla fila di monete normali: bassa
     // probabilità, valore moltiplicato (vedi G.redCoinChance/redCoinValueMultiplier).
     if (Math.random() < G.redCoinChance) {
-      let redLane = Math.floor(Math.random() * 3);
-      if (redLane === obsLane) redLane = (redLane + 1) % 3;
+      const redLane = pickFreeLane();
       const red = spawnFrom(coins);
       if (red) {
         red.active = true;
@@ -1258,15 +1288,15 @@ export async function createGameScene({ engine, canvas, goto }) {
       ob.mesh.position.z -= move;
       // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
       ob.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - ob.mesh.position.z) / FADE_DISTANCE));
-      // Collisione: vicino in z, stessa corsia (o tutte, per i tipi che
-      // coprono l'intera larghezza), player non abbastanza in alto da
-      // superarla saltando (soglia specifica del tipo di ostacolo).
+      // Collisione: vicino in z, dentro la larghezza reale del blocco
+      // (collisionHalfWidth, calcolata da laneSpan — combacia sempre con la
+      // geometria visibile, vedi OBSTACLE_TYPES), player non abbastanza in
+      // alto da superarla saltando (soglia specifica del tipo di ostacolo).
       const t = ob.obstacleType;
-      const laneHit = t.spanAllLanes || Math.abs(ob.mesh.position.x - px) < t.collisionHalfWidth;
       if (
         state.invulnerableTimer <= 0 &&
         Math.abs(ob.mesh.position.z) < 0.9 &&
-        laneHit &&
+        Math.abs(ob.mesh.position.x - px) < t.collisionHalfWidth &&
         py < t.jumpClearY
       ) {
         hitObstacle(ob);

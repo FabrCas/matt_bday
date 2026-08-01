@@ -3,6 +3,7 @@ import {
   FreeCamera,
   HemisphericLight,
   MeshBuilder,
+  Mesh,
   StandardMaterial,
   Color3,
   Color4,
@@ -49,6 +50,12 @@ export function createMenuScene({ engine, goto }) {
   logoMat.backFaceCulling = false;
   logoPlane.material = logoMat;
   logoPlane.position.set(0, logoStartY, 0);
+  // La camera del menu guarda dall'alto verso il basso con un'inclinazione
+  // marcata (height ben sopra LOGO_TARGET_Y): un piano piatto senza
+  // billboard mostrerebbe l'effetto prospettico "trapezio"/keystone tipico
+  // di una superficie vista di sbieco. BILLBOARDMODE_ALL lo mantiene sempre
+  // perfettamente frontale alla camera, qualunque sia l'angolo.
+  logoPlane.billboardMode = Mesh.BILLBOARDMODE_ALL;
 
   ui.show("menu");
 
