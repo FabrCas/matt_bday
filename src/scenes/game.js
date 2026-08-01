@@ -48,9 +48,13 @@ const TILE_AO = "tiles/ground_tiles_03_ambient_occlusion_1k.png";
 const TILE_ROUGHNESS = "tiles/ground_tiles_03_roughness_1k.png";
 
 const TILE_BASECOLOR_1 = "tiles/ground_tiles_24_baseColo_1k.png";
-const TILE_NORMAL_1 = "tiles/ground_tiles_24_height_1k.png";
+const TILE_NORMAL_1 = "tiles/ground_tiles_24_normal_gl_1k.png";
 const TILE_AO_1 = "tiles/ground_tiles_24_ambientOcclusion_1k.png";
 const TILE_ROUGHNESS_1 = "tiles/ground_tiles_24_roughness_1k.png";
+// Ogni GROUND_THEME_SWITCH_DISTANCE metri percorsi il pavimento alterna tra
+// il set "03" (sopra) e il set "24" (qui sopra): 0-1000m set 03, 1000-2000m
+// set 24, 2000-3000m di nuovo 03, e così via (vedi update()).
+const GROUND_THEME_SWITCH_DISTANCE = 1000;
 // La height map non è usata: richiederebbe parallax occlusion mapping
 // (Babylon la legge dal canale alpha della normal map, che andrebbe
 // ricomposta a runtime unendo le due immagini) per un costo GPU per-pixel
@@ -71,7 +75,7 @@ const START_SPEED = G.startSpeed; // unità/s in avanti (mondo che scorre)
 const MAX_SPEED = G.maxSpeed;
 const ACCEL = G.acceleration; // incremento velocità nel tempo
 const SPAWN_AHEAD = G.spawnAhead; // distanza a cui vengono generati gli oggetti
-const DESPAWN_BEHIND = -12; // dietro la camera -> riciclo/rimozione (interno)
+const DESPAWN_BEHIND = - 40; // dietro la camera -> riciclo/rimozione (interno)
 const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
 const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete allo spawn
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
@@ -92,12 +96,12 @@ const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
-const LAMP_INTENSITY = 1;
+const LAMP_INTENSITY = 10;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
 // in modo visibile, dando l'effetto di "spegnimento di colpo".
-const LAMP_FADE_DISTANCE = LAMP_GAP/2;
+const LAMP_FADE_DISTANCE = LAMP_GAP*0.25;
 // StandardMaterial limita di default a 4 le luci che possono illuminare
 // contemporaneamente una mesh (`maxSimultaneousLights`). Con hemi + N point
 // light dei lampadari si supera facilmente quel budget, e Babylon ne scarta
@@ -191,9 +195,9 @@ export async function createGameScene({ engine, canvas, goto }) {
   // lungo il corridoio insieme al resto della scena.
   // const hemi = new HemisphericLight("hemi", new Vector3(0, 0, 1), scene);
   // hemi.intensity = 0.01;
-  const direct = new DirectionalLight("directional", new Vector3(0,-1,1), scene);
-  direct.intensity = 1.5; // alzata: 0.5 rendeva il player poco reattivo alla luce
-  direct.specular = new Color3(1, 1, 1);
+  // const direct = new DirectionalLight("directional", new Vector3(0,-1,1), scene);
+  // direct.intensity = 2; // alzata: 0.5 rendeva il player poco reattivo alla luce
+  // direct.specular = new Color3(1, 1, 1);
 
   // Luce dedicata che segue il player (aggiornata in update()): a differenza
   // dei lampadari, che lo illuminano solo quando è vicino, garantisce un
@@ -210,12 +214,18 @@ export async function createGameScene({ engine, canvas, goto }) {
   // 4 mappe e imposta la ripetizione UV in base alla dimensione reale della
   // superficie, così la texture non risulta stirata su pavimento/muri che
   // hanno proporzioni molto diverse tra loro.
-  function makeTiledPbrMaterial(name, repeatU, repeatV) {
+  function makeTiledPbrMaterial(name, repeatU, repeatV, files) {
+    const {
+      basecolor = TILE_BASECOLOR,
+      normal: normalFile = TILE_NORMAL,
+      ao: aoFile = TILE_AO,
+      roughness: roughnessFile = TILE_ROUGHNESS,
+    } = files || {};
     const mat = new PBRMaterial(name, scene);
-    const albedo = loadTexture(scene, TILE_BASECOLOR);
-    const normal = loadTexture(scene, TILE_NORMAL);
-    const ao = loadTexture(scene, TILE_AO);
-    const roughness = loadTexture(scene, TILE_ROUGHNESS);
+    const albedo = loadTexture(scene, basecolor);
+    const normal = loadTexture(scene, normalFile);
+    const ao = loadTexture(scene, aoFile);
+    const roughness = loadTexture(scene, roughnessFile);
     for (const tex of [albedo, normal, ao, roughness]) {
       tex.uScale = repeatU;
       tex.vScale = repeatV;
@@ -246,10 +256,43 @@ export async function createGameScene({ engine, canvas, goto }) {
   // WALL_HEIGHT) assumendo una tile ~2 unità di mondo per ripetizione:
   // aggiustare qui se la texture risulta troppo piccola/grande a schermo.
   const repeat_factor = 6;
-  const groundMat = makeTiledPbrMaterial("groundMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
+  const groundMatA = makeTiledPbrMaterial("groundMatA", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
 
-  const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / repeat_factorgi, WALL_HEIGHT / repeat_factor);
+  const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
   wallMat.backFaceCulling = false;
+
+  // Pool di materiali per il set di texture alternativo "24" (vedi update():
+  // pavimento/muri/soffitto passano a questo set ogni
+  // GROUND_THEME_SWITCH_DISTANCE metri, ma solo pezzo per pezzo man mano che
+  // vengono riciclati — non tutti insieme, vedi commento nel loop di
+  // scorrimento). Più istanze per superficie, ciascuna con la propria
+  // rotazione UV casuale (wAng): altrimenti, essendo tutti i pezzi la stessa
+  // immagine con lo stesso orientamento, il risultato è visivamente troppo
+  // regolare. Ad ogni riciclo se ne pesca una a caso dal pool.
+  function makeThemeBMatPool(namePrefix, count, repeatU, repeatV) {
+    return Array.from({ length: count }, (_, i) => {
+      const mat = makeTiledPbrMaterial(`${namePrefix}${i}`, repeatU, repeatV, {
+        basecolor: TILE_BASECOLOR_1,
+        normal: TILE_NORMAL_1,
+        ao: TILE_AO_1,
+        roughness: TILE_ROUGHNESS_1,
+      });
+      if (namePrefix !== "groundMatB") mat.backFaceCulling = false; // muri e soffitto vanno visti da entrambi i lati, come wallMat
+      const wAng = Math.random() * Math.PI * 2;
+      mat.albedoTexture.wAng = wAng;
+      mat.bumpTexture.wAng = wAng;
+      mat.ambientTexture.wAng = wAng;
+      mat.metallicTexture.wAng = wAng;
+      return mat;
+    });
+  }
+  const groundMatsB = makeThemeBMatPool("groundMatB", NUM_TILES, TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
+  const wallMatsB = makeThemeBMatPool("wallMatB", NUM_TILES, TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
+  const ceilingMatsB = makeThemeBMatPool("ceilingMatB", NUM_TILES, TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
+
+  function pickRandom(pool) {
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
 
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
   obstacleMat.diffuseColor = new Color3(0.85, 0.2, 0.25);
@@ -383,7 +426,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       { width: CORRIDOR_HALF_WIDTH * 2, height: 0.5, depth: TILE_LEN },
       scene
     );
-    t.material = groundMat;
+    t.material = groundMatA;
     t.position.set(0, -0.25, i * TILE_LEN);
     tiles.push(t);
   }
@@ -884,6 +927,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     const move = state.speed * dt;
     state.distance += move;
 
+    // Tema texture corrente per pavimento/muri/soffitto (vedi loop di
+    // scorrimento più sotto): calcolato ogni frame da state.distance, ma
+    // applicato SOLO ai pezzi che si riciclano in questo stesso frame — i
+    // pezzi già visibili, renderizzati con il tema precedente, non vengono
+    // ritinti retroattivamente. Il cambio si nota quindi gradualmente, pezzo
+    // per pezzo, man mano che il corridoio scorre e ricicla.
+    const groundTheme = Math.floor(state.distance / GROUND_THEME_SWITCH_DISTANCE) % 2;
+
     // Movimento laterale (lerp verso la corsia target).
     player.position.x += (state.targetX - player.position.x) * Math.min(1, LANE_LERP * dt);
 
@@ -901,18 +952,29 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
 
-    // Scorrimento pista.
+    // Scorrimento pista. Il materiale viene (ri)assegnato solo al riciclo,
+    // in base al tema corrente in quel momento: così un pezzo mantiene la
+    // texture con cui è stato visto finché non esce di scena e rientra.
     for (const t of tiles) {
       t.position.z -= move;
-      if (t.position.z < -TILE_LEN) t.position.z += TILE_LEN * NUM_TILES;
+      if (t.position.z < -TILE_LEN) {
+        t.position.z += TILE_LEN * NUM_TILES;
+        t.material = groundTheme === 0 ? groundMatA : pickRandom(groundMatsB);
+      }
     }
     for (const w of walls) {
       w.position.z -= move;
-      if (w.position.z < -TILE_LEN) w.position.z += TILE_LEN * NUM_TILES;
+      if (w.position.z < -TILE_LEN) {
+        w.position.z += TILE_LEN * NUM_TILES;
+        w.material = groundTheme === 0 ? wallMat : pickRandom(wallMatsB);
+      }
     }
     for (const c of ceilings) {
       c.position.z -= move;
-      if (c.position.z < -TILE_LEN) c.position.z += TILE_LEN * NUM_TILES;
+      if (c.position.z < -TILE_LEN) {
+        c.position.z += TILE_LEN * NUM_TILES;
+        c.material = groundTheme === 0 ? wallMat : pickRandom(ceilingMatsB);
+      }
     }
     // for (const s of stripes) {
     //   s.position.z -= move;

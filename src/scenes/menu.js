@@ -11,8 +11,18 @@ import {
 import * as ui from "../ui/ui.js";
 import { getCameraProfile_menu } from "../utils/responsive.js";
 import { unlockAudio } from "../utils/audioLoader.js";
+import { CONFIG } from "../config/index.js";
 
-// Scena Menu: sfondo 3D leggero (una forma che ruota) + overlay HTML per i testi.
+// Piano del logo: parte da sopra la vista e scende fino al centro, dove si
+// ferma (vedi update()). Per ora materiale a tinta unita: la texture reale
+// del logo verrà applicata in seguito (basta assegnarla a logoMat.diffuseTexture).
+const LOGO_WIDTH = 3;
+const LOGO_HEIGHT = 3;
+const LOGO_TARGET_Y = 1; // stessa altezza a cui puntava la camera/la vecchia gem
+const LOGO_START_Y = LOGO_TARGET_Y + 5; // sopra la vista, fuori schermo
+const LOGO_DROP_SPEED = 3; // unità/s
+
+// Scena Menu: sfondo 3D leggero (il piano del logo che scende) + overlay HTML per i testi.
 export function createMenuScene({ engine, goto }) {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.06, 0.09, 0.16, 1);
@@ -25,29 +35,29 @@ export function createMenuScene({ engine, goto }) {
   const light = new HemisphericLight("menuLight", new Vector3(0.4, 1, 0.2), scene);
   light.intensity = 0.9;
 
-  // Forma decorativa che ruota lentamente.
-  const gem = MeshBuilder.CreateIcoSphere("gem", { radius: 1.4, subdivisions: 2 }, scene);
-  const mat = new StandardMaterial("gemMat", scene);
-  mat.diffuseColor = new Color3(0.22, 0.74, 0.97);
-  mat.emissiveColor = new Color3(0.1, 0.35, 0.55);
-  gem.material = mat;
-  gem.position.y = 1;
+  const logoPlane = MeshBuilder.CreatePlane("logoPlane", { width: LOGO_WIDTH, height: LOGO_HEIGHT }, scene);
+  const logoMat = new StandardMaterial("logoMat", scene);
+  logoMat.diffuseColor = new Color3(0.22, 0.74, 0.97);
+  logoMat.emissiveColor = new Color3(0.1, 0.35, 0.55);
+  logoMat.specularColor = new Color3(0, 0, 0);
+  logoMat.backFaceCulling = false;
+  logoPlane.material = logoMat;
+  logoPlane.position.set(0, LOGO_START_Y, 0);
 
   ui.show("menu");
+
+  // Se in debug si salta la schermata comandi (comodo durante lo sviluppo,
+  // per non dover aspettare ad ogni riavvio della partita).
+  function goToPlay() {
+    unlockAudio();
+    goto(CONFIG.debug ? "game" : "controls");
+  }
 
   // Un solo binding dei pulsanti per l'intera vita dell'app.
   if (!createMenuScene._bound) {
     ui.bindButtons({
-      // unlockAudio() va chiamato dentro un gesture utente (click): sblocca
-      // l'AudioContext sospeso di default dai browser per policy autoplay.
-      onPlay: () => {
-        unlockAudio();
-        goto("game");
-      },
-      onRetry: () => {
-        unlockAudio();
-        goto("game");
-      },
+      onPlay: goToPlay,
+      onRetry: goToPlay,
       onContinue: () => goto("wishes"),
       onMenu: () => goto("menu"),
     });
@@ -55,8 +65,9 @@ export function createMenuScene({ engine, goto }) {
   }
 
   function update(dt) {
-    gem.rotation.y += dt * 0.6;
-    gem.rotation.x += dt * 0.2;
+    if (logoPlane.position.y > LOGO_TARGET_Y) {
+      logoPlane.position.y = Math.max(LOGO_TARGET_Y, logoPlane.position.y - LOGO_DROP_SPEED * dt);
+    }
   }
 
   function dispose() {
