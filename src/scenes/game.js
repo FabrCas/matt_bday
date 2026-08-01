@@ -8,6 +8,7 @@ import {
   Mesh,
   StandardMaterial,
   PBRMaterial,
+  Texture,
   Color3,
   Color4,
   Vector3,
@@ -546,17 +547,73 @@ export async function createGameScene({ engine, canvas, goto }) {
     return (z + cam.distance) * fogTanHalfH * 0.92;
   }
 
+  // Le immagini di nebbia hanno proporzioni diverse tra loro (alcune molto
+  // larghe, altre molto strette) e non quadrate come il piano fisso
+  // FOG_WALL_WIDTH×FOG_WALL_HEIGHT su cui vengono applicate: senza
+  // correzione risultano stirate/deformate. Le dimensioni reali si leggono
+  // una sola volta qui (non deducibili dal nome file), prima di costruire i
+  // materiali, per calcolare un fit "a copertura" (come CSS
+  // background-size: cover): scala uniforme, l'immagine riempie tutto il
+  // piano senza deformarsi, l'eccedenza viene ritagliata invece di stirata.
+  const fogImageSizes = new Map();
+  await Promise.all(
+    FOG_TEXTURES.map(async (file) => {
+      try {
+        const el = await loadHtmlImage(file);
+        fogImageSizes.set(file, { width: el.naturalWidth, height: el.naturalHeight });
+      } catch {
+        fogImageSizes.set(file, { width: 1, height: 1 }); // fallback: nessun crop
+      }
+    })
+  );
+
+  const fogPlaneAspect = FOG_WALL_WIDTH / FOG_WALL_HEIGHT;
+  function coverUvFit(imgAspect, planeAspect) {
+    if (imgAspect > planeAspect) {
+      // Immagine relativamente più larga del piano: altezza piena, taglio ai lati.
+      const uScale = planeAspect / imgAspect;
+      return { uScale, vScale: 1, uOffset: (1 - uScale) / 2, vOffset: 0 };
+    }
+    // Immagine relativamente più stretta/alta del piano: larghezza piena, taglio sopra/sotto.
+    const vScale = imgAspect / planeAspect;
+    return { uScale: 1, vScale, uOffset: 0, vOffset: (1 - vScale) / 2 };
+  }
+
   const fogMats = FOG_TEXTURES.map((file, idx) => {
     const mat = new StandardMaterial("fogMat" + idx, scene);
     const tex = loadTexture(scene, file);
     tex.hasAlpha = true;
+    // CLAMP invece del wrap a ripetizione di default: con uScale/vScale < 1
+    // (il ritaglio "a copertura" qui sopra) e la deriva UV animata in
+    // update(), il wrap farebbe ricomparire visibilmente l'immagine ai
+    // bordi quando l'offset esce dalla finestra ritagliata.
+    tex.wrapU = Texture.CLAMP_ADDRESSMODE;
+    tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+    const size = fogImageSizes.get(file);
+    const fit = coverUvFit(size.width / size.height, fogPlaneAspect);
+    tex.uScale = fit.uScale;
+    tex.vScale = fit.vScale;
+    tex.uOffset = fit.uOffset;
+    tex.vOffset = fit.vOffset;
     mat.diffuseTexture = tex;
     mat.useAlphaFromDiffuseTexture = true;
     mat.emissiveColor = new Color3(0.5, 0.5, 0.52); // grigio neutro: leggibile contro lo sfondo nero
     mat.specularColor = new Color3(0, 0, 0);
     mat.disableLighting = true;
     mat.backFaceCulling = false;
-    return { material: mat, texture: tex, uSpeed: 0.02 + idx * 0.01, vSpeed: 0.015 + idx * 0.008, file: file};
+    return {
+      material: mat,
+      texture: tex,
+      uSpeed: 0.02 + idx * 0.01,
+      vSpeed: 0.015 + idx * 0.008,
+      file: file,
+      // Offset di base del ritaglio "a copertura": la deriva UV in update()
+      // deve oscillare attorno a questi valori, non sovrascriverli.
+      baseUOffset: fit.uOffset,
+      baseVOffset: fit.vOffset,
+      uScale: fit.uScale,
+      vScale: fit.vScale,
+    };
   });
 
   const fogWisp = MeshBuilder.CreatePlane(
@@ -1151,10 +1208,14 @@ export async function createGameScene({ engine, canvas, goto }) {
         const fadeOut = Math.min(1, (1 - fogState.progress) / FOG_EDGE_FADE);
         fogWisp.visibility = Math.min(fadeIn, fadeOut) * 0.6;
         // Deriva UV oscillante del materiale attivo (non uno scroll continuo,
-        // per non mostrare la giuntura di una texture non seamless).
+        // per non mostrare la giuntura di una texture non seamless), attorno
+        // all'offset base del ritaglio "a copertura" (non lo sovrascrive) e
+        // scalata per uScale/vScale: così resta sempre dentro la finestra
+        // dell'immagine effettivamente ritagliata, senza mai raggiungere il
+        // bordo clampato (che si vedrebbe come un fermo immagine ai lati).
         const m = fogState.mat;
-        m.texture.uOffset = Math.sin(state.fogTime * m.uSpeed) * 0.1;
-        m.texture.vOffset = Math.sin(state.fogTime * m.vSpeed) * 0.06;
+        m.texture.uOffset = m.baseUOffset + Math.sin(state.fogTime * m.uSpeed) * 0.1 * m.uScale;
+        m.texture.vOffset = m.baseVOffset + Math.sin(state.fogTime * m.vSpeed) * 0.06 * m.vScale;
       }
     }
 
