@@ -11,6 +11,7 @@ import {
 import * as ui from "../ui/ui.js";
 import { getCameraProfile_menu } from "../utils/responsive.js";
 import { unlockAudio } from "../utils/audioLoader.js";
+import { loadTexture, loadHtmlImage } from "../utils/textureLoader.js";
 import { CONFIG } from "../config/index.js";
 
 // Piano del logo: parte da sopra la vista e scende fino al centro, dove si
@@ -41,14 +42,17 @@ export function createMenuScene({ engine, goto }) {
   const logoHeight = logoFullViewHeight * CONFIG.menu.logoHeightScale;
   const logoStartY = LOGO_TARGET_Y + logoHeight; // sopra la vista, fuori schermo
 
+  const image_logo = loadTexture(scene, "stanis_hd.jpg")
+
   const logoPlane = MeshBuilder.CreatePlane("logoPlane", { width: logoWidth, height: logoHeight }, scene);
   const logoMat = new StandardMaterial("logoMat", scene);
-  logoMat.diffuseColor = new Color3(0.22, 0.74, 0.97);
+  logoMat.diffuseTexture = image_logo;
   logoMat.emissiveColor = new Color3(0.1, 0.35, 0.55);
   logoMat.specularColor = new Color3(0, 0, 0);
   logoMat.backFaceCulling = false;
   logoPlane.material = logoMat;
   logoPlane.position.set(0, logoStartY, 0);
+  // logoPlane.rotation = new Vector3(Math.PI/6,0,0);
 
   ui.show("menu");
 
