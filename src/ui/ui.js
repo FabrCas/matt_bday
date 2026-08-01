@@ -5,6 +5,7 @@ import { CONFIG, formatMoney } from "../config/index.js";
 const screens = {
   loading: document.getElementById("loading"),
   menu: document.getElementById("menu"),
+  controls: document.getElementById("controls"),
   hud: document.getElementById("hud"),
   gameover: document.getElementById("gameover"),
   wishes: document.getElementById("wishes"),
@@ -23,6 +24,7 @@ const els = {
   btnRetry: document.getElementById("btn-retry"),
   wishesMessage: document.getElementById("wishes-message"),
   hitFlash: document.getElementById("hit-flash"),
+  controlsCountdown: document.getElementById("controls-countdown"),
 };
 
 // Applica titolo/sottotitolo dalla config statica (una volta all'avvio).
@@ -56,6 +58,11 @@ export function updateGameOver({ coins, distance, amount, message}) {
 }
 export function updateWishes() {
   els.wishesMessage.textContent = CONFIG.game.wishesMessage;
+}
+
+// Secondi rimanenti prima del passaggio automatico al gioco (vedi controls.js).
+export function updateControlsCountdown(secondsLeft) {
+  els.controlsCountdown.textContent = Math.ceil(secondsLeft);
 }
 
 // Flash rosso a schermo intero al momento di un colpo (vedi hitObstacle() in

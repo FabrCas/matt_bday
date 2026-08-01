@@ -96,7 +96,7 @@ const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
-const LAMP_INTENSITY = 10;
+const LAMP_INTENSITY = 2;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
@@ -124,10 +124,6 @@ const MAX_LIGHTS = LAMP_COUNT + 1; // + direzionale + playerLight
 // (sinistra→destra o il contrario), attraversa lo schermo con una
 // dissolvenza in entrata/uscita (mai un pop ai margini), poi dopo una
 // pausa casuale ne parte un altro — imprevedibile, non un loop meccanico.
-// Dentro la zona di fog localizzata (SPAWN_AHEAD → +FOG_LINEAR_RANGE, vedi
-// createGameScene), non prima: il velo deve attraversare mentre la nebbia
-// è già presente, non nella zona nitida davanti al giocatore.
-const FOG_WALL_Z = SPAWN_AHEAD + 12;
 const FOG_WALL_Y = WALL_HEIGHT * 0.55;
 const FOG_WALL_WIDTH = 10;
 const FOG_WALL_HEIGHT = 10;
@@ -137,6 +133,16 @@ const FOG_EDGE_FADE = 0.15; // frazione iniziale/finale del tragitto dedicata al
 const FOG_COOLDOWN_MIN = 1.5; // pausa tra un velo e il successivo
 const FOG_COOLDOWN_MAX = 4;
 const FOG_LINEAR_RANGE = 40;
+// Dentro la zona di fog localizzata (SPAWN_AHEAD → +FOG_LINEAR_RANGE, vedi
+// createGameScene), non prima: il velo deve attraversare mentre la nebbia
+// è già presente, non nella zona nitida davanti al giocatore. La distanza
+// viene scelta a caso (non più fissa) ad ogni nuovo passaggio, tra questi
+// due estremi, così il velo non compare sempre alla stessa identica
+// profondità (vedi spawnFogWisp()).
+// const FOG_WALL_Z_MIN = SPAWN_AHEAD + 5;
+// const FOG_WALL_Z_MAX = SPAWN_AHEAD + FOG_LINEAR_RANGE - 5;
+const FOG_WALL_Z_MIN = 20;
+const FOG_WALL_Z_MAX = SPAWN_AHEAD - 15;
 // ---- Cartelloni ai lati della strada (stesso schema di riciclo delle strisce) ----
 // Ogni "coppia" (sx+dx) mostra sempre la stessa immagine, pescata a caso dal
 // pool di CONFIG.billboards.images con un sistema "bag" (stile Tetris): le
@@ -195,9 +201,9 @@ export async function createGameScene({ engine, canvas, goto }) {
   // lungo il corridoio insieme al resto della scena.
   // const hemi = new HemisphericLight("hemi", new Vector3(0, 0, 1), scene);
   // hemi.intensity = 0.01;
-  // const direct = new DirectionalLight("directional", new Vector3(0,-1,1), scene);
-  // direct.intensity = 2; // alzata: 0.5 rendeva il player poco reattivo alla luce
-  // direct.specular = new Color3(1, 1, 1);
+  const direct = new DirectionalLight("directional", new Vector3(0,-1,1), scene);
+  direct.intensity = 1; // alzata: 0.5 rendeva il player poco reattivo alla luce
+  direct.specular = new Color3(1, 1, 1);
 
   // Luce dedicata che segue il player (aggiornata in update()): a differenza
   // dei lampadari, che lo illuminano solo quando è vicino, garantisce un
@@ -523,12 +529,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   // distanza (dal FOV orizzontale reale, aspect ratio incluso), con un
   // margine di sicurezza: il velo nasce/muore appena dentro al bordo dello
   // schermo invece che a un X arbitrario che potrebbe restare sempre
-  // fuori vista (o sempre dentro, "murando" il fondo).
+  // fuori vista (o sempre dentro, "murando" il fondo). Dipende dalla
+  // distanza (più lontano = schermo "più largo" in unità di mondo), quindi
+  // va ricalcolata ad ogni spawn in base allo z scelto a caso in quel momento.
   const fogAspect = engine.getRenderWidth() / engine.getRenderHeight();
   const fogTanHalfV = Math.tan(cam.fov / 2);
   const fogTanHalfH = fogTanHalfV * fogAspect;
-  const fogDistanceFromCamera = FOG_WALL_Z + cam.distance;
-  const FOG_TRAVEL_HALF = fogDistanceFromCamera * fogTanHalfH * 0.92;
+  function fogTravelHalfAt(z) {
+    return (z + cam.distance) * fogTanHalfH * 0.92;
+  }
 
   const fogMats = FOG_TEXTURES.map((file, idx) => {
     const mat = new StandardMaterial("fogMat" + idx, scene);
@@ -548,7 +557,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     { width: FOG_WALL_WIDTH, height: FOG_WALL_HEIGHT },
     scene
   );
-  fogWisp.position.set(0, FOG_WALL_Y, FOG_WALL_Z);
+  fogWisp.position.set(0, FOG_WALL_Y, FOG_WALL_Z_MIN);
   fogWisp.setEnabled(false);
 
   // Stato del velo attivo/in pausa: gestito interamente in update() (vedi
@@ -566,8 +575,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     const dir = Math.random() < 0.5 ? 1 : -1; // sinistra→destra o il contrario, a caso
     fogState.mat = fogMats[Math.floor(Math.random() * fogMats.length)];
     fogWisp.material = fogState.mat.material;
-    fogState.fromX = -dir * FOG_TRAVEL_HALF;
-    fogState.toX = dir * FOG_TRAVEL_HALF;
+    // Distanza casuale (non più fissa) tra FOG_WALL_Z_MIN e FOG_WALL_Z_MAX:
+    // il tragitto orizzontale va ricalcolato di conseguenza, dato che dipende
+    // dalla distanza dalla camera.
+    const z = FOG_WALL_Z_MIN + Math.random() * (FOG_WALL_Z_MAX - FOG_WALL_Z_MIN);
+    fogWisp.position.z = z;
+    const travelHalf = fogTravelHalfAt(z);
+    fogState.fromX = -dir * travelHalf;
+    fogState.toX = dir * travelHalf;
     fogState.progress = 0;
     fogState.duration = FOG_CROSS_DURATION_MIN + Math.random() * (FOG_CROSS_DURATION_MAX - FOG_CROSS_DURATION_MIN);
     fogState.active = true;

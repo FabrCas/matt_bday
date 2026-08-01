@@ -2,6 +2,7 @@ import { Engine } from "@babylonjs/core";
 import * as ui from "./ui/ui.js";
 import { onResize } from "./utils/responsive.js";
 import { createMenuScene } from "./scenes/menu.js";
+import { createControlsScene } from "./scenes/controls.js";
 import { createGameScene } from "./scenes/game.js";
 import { createGameOverScene } from "./scenes/gameover.js";
 import { createWishesScene } from "./scenes/wishes.js";
@@ -17,6 +18,7 @@ const engine = new Engine(canvas, true, {
 
 const factories = {
   menu: createMenuScene,
+  controls: createControlsScene,
   game: createGameScene,
   gameover: createGameOverScene,
   wishes: createWishesScene,

@@ -30,6 +30,17 @@
         <button id="btn-play" class="btn">Play</button>
     </div>
 
+    <!-- Comandi (scena intermedia menu -> game, saltata se debug) -->
+    <div id="controls" class="overlay hidden">
+        <h2 class="title">Comandi</h2>
+        <ul class="controls-list">
+            <li><span class="controls-keys">⬅️ ➡️ / A D</span> Cambia corsia</li>
+            <li><span class="controls-keys">⬆️ / W / Spazio / Tap</span> Salta</li>
+            <li><span class="controls-keys">⬇️ / S / Swipe giù</span> Scendi rapidamente in aria</li>
+        </ul>
+        <p class="subtitle">Si parte tra <span id="controls-countdown">0</span>…</p>
+    </div>
+
     <!-- HUD in-game -->
     <div id="hud" class="hud hidden">
         <div class="hud-item" id="hud-lives"></div>

@@ -25,6 +25,9 @@ const defaults = {
     count: 8,   // numero di coppie sx/dx lungo il corridoio
     images: [], // pool di immagini pescate a caso senza ripetizioni (vedi game.js)
   },
+  controls: {
+    duration: 4, // secondi di permanenza sulla schermata comandi prima di passare al gioco
+  },
   gameplay: {
     lanes: [-2.2, 0, 2.2],
     startSpeed: 14,

@@ -25,6 +25,10 @@ game:
 wishes:
   galleryPlaneCount: 10    # numero di piani quadrati che orbitano intorno al testo
 
+# --- Scena comandi (mostrata tra menu e game, saltata se debug: true) ---
+controls:
+  duration: 5              # secondi di permanenza prima di passare automaticamente al gioco
+
 # --- Cartelloni pubblicitari del corridoio ---
 billboards:
   count: 8                # numero di coppie sx/dx lungo il corridoio (riciclate come il resto)
