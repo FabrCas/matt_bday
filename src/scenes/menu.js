@@ -41,7 +41,13 @@ export function createMenuScene({ engine, goto }) {
   const logoFullViewHeight = 2 * cam.distance * Math.tan(cam.fov / 2);
   const logoWidth = CONFIG.menu.logoWidth;
   const logoHeight = logoFullViewHeight * CONFIG.menu.logoHeightScale;
-  const logoStartY = LOGO_TARGET_Y + logoHeight; // sopra la vista, fuori schermo
+  // Il piano va ancorato al bordo SUPERIORE dello schermo (non centrato sul
+  // target della camera): sotto ci sono titolo/sottotitolo/bottone HTML
+  // (vedi #menu in style.css, ancorato alla fascia inferiore), quindi
+  // l'immagine deve occupare solo la fascia in alto, senza sovrapporsi.
+  const screenTopY = LOGO_TARGET_Y + logoFullViewHeight / 2; // bordo superiore visibile a schermo
+  const logoRestY = screenTopY - logoHeight / 2; // posizione finale, dopo la discesa
+  const logoStartY = screenTopY + logoHeight; // sopra la vista, fuori schermo
 
   const image_logo = loadTexture(scene, "stanis_hd.jpg")
 
@@ -82,8 +88,8 @@ export function createMenuScene({ engine, goto }) {
   }
 
   function update(dt) {
-    if (logoPlane.position.y > LOGO_TARGET_Y) {
-      logoPlane.position.y = Math.max(LOGO_TARGET_Y, logoPlane.position.y - LOGO_DROP_SPEED * dt);
+    if (logoPlane.position.y > logoRestY) {
+      logoPlane.position.y = Math.max(logoRestY, logoPlane.position.y - LOGO_DROP_SPEED * dt);
     }
   }
 

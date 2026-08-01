@@ -25,9 +25,11 @@ game:
 menu:
   logoWidth: 8.5           # larghezza del piano del logo (unità di mondo)
   # Altezza del piano = altezza visibile a schermo (a quella distanza dalla
-  # camera) moltiplicata per questo fattore: 1 = occupa tutta la visuale in
-  # verticale, <1 lascia un margine sopra/sotto.
-  logoHeightScale: 1.
+  # camera) moltiplicata per questo fattore. Il piano resta ancorato al
+  # bordo SUPERIORE dello schermo (non centrato): 0.6 = occupa la fascia
+  # superiore del 60%, lasciando libero il 40% inferiore per titolo/
+  # sottotitolo/bottone.
+  logoHeightScale: 0.6
 
 # --- Scena Auguri ---
 wishes:

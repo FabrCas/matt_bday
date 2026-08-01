@@ -71,10 +71,17 @@ html, body {
 }
 
 /* Stesso problema del menu: il piano del logo occupa gran parte della vista
-   3D dietro l'overlay, e il "backdrop-filter: blur" lo sfocava. */
+   3D dietro l'overlay, e il "backdrop-filter: blur" lo sfocava.
+   Il logo 3D occupa il 60% superiore dello schermo (vedi menu.js): il
+   contenuto HTML (titolo/sottotitolo/bottone) va quindi ancorato alla fascia
+   inferiore del 40%, non centrato sull'intero schermo, altrimenti si
+   sovrapporrebbe all'immagine. */
 #menu {
   background: none;
   backdrop-filter: none;
+  justify-content: flex-end;
+  padding-top: 0;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 3rem);
 }
 
 .hidden {

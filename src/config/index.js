@@ -20,7 +20,7 @@ const defaults = {
   },
   menu: {
     logoWidth: 3.5, // larghezza del piano del logo (unità di mondo)
-    logoHeightScale: 1, // frazione dell'altezza visibile a schermo occupata dal piano
+    logoHeightScale: 0.6, // frazione dell'altezza visibile a schermo occupata dal piano, ancorato in alto
   },
   wishes: {
     galleryPlaneCount: 6, // numero di piani che orbitano intorno al testo
