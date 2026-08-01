@@ -13,6 +13,7 @@ const screens = {
 const els = {
   hudCoins: document.getElementById("hud-coins"),
   hudDistance: document.getElementById("hud-distance"),
+  hudLives: document.getElementById("hud-lives"),
   wonAmount: document.getElementById("won-amount"),
   endMessage: document.getElementById("endgame-message"),
   goCoins: document.getElementById("go-coins"),
@@ -21,6 +22,7 @@ const els = {
   menuSubtitle: document.getElementById("menu-subtitle"),
   btnRetry: document.getElementById("btn-retry"),
   wishesMessage: document.getElementById("wishes-message"),
+  hitFlash: document.getElementById("hit-flash"),
 };
 
 // Applica titolo/sottotitolo dalla config statica (una volta all'avvio).
@@ -37,9 +39,12 @@ export function show(...names) {
   }
 }
 
-export function updateHud({ coins, distance }) {
+export function updateHud({ coins, distance, lives, maxLives }) {
   els.hudCoins.textContent = coins + " €";
   els.hudDistance.textContent = Math.floor(distance);
+  if (lives !== undefined && maxLives !== undefined) {
+    els.hudLives.textContent = "❤️".repeat(lives) + "🖤".repeat(maxLives - lives);
+  }
 }
 
 export function updateGameOver({ coins, distance, amount, message}) {
@@ -51,6 +56,17 @@ export function updateGameOver({ coins, distance, amount, message}) {
 }
 export function updateWishes() {
   els.wishesMessage.textContent = CONFIG.game.wishesMessage;
+}
+
+// Flash rosso a schermo intero al momento di un colpo (vedi hitObstacle() in
+// game.js). Rimuove/riaggiunge la classe forzando un reflow (`offsetWidth`)
+// così un colpo che arriva mentre il flash precedente sta ancora sfumando
+// riparte da capo invece di restare "agganciato" alla transizione in corso.
+export function flashHit() {
+  els.hitFlash.classList.remove("active");
+  void els.hitFlash.offsetWidth;
+  els.hitFlash.classList.add("active");
+  setTimeout(() => els.hitFlash.classList.remove("active"), 80);
 }
 
 // Collega i pulsanti una sola volta; ritorna gli handler da riassegnare.

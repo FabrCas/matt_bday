@@ -151,6 +151,25 @@ html, body {
   backdrop-filter: blur(4px);
 }
 
+/* Flash rosso al momento di un colpo (vedi ui.flashHit()): appare di scatto
+   (transizione quasi nulla in entrata) e sfuma via in ~0.4s quando la classe
+   "active" viene rimossa, per dare l'idea dell'impatto senza restare troppo
+   a lungo a coprire la vista. */
+#hit-flash {
+  position: fixed;
+  inset: 0;
+  background: rgba(220, 38, 38, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+  transition: opacity 0.4s ease-out;
+}
+
+#hit-flash.active {
+  opacity: 1;
+  transition: opacity 0.03s ease-in;
+}
+
 /* ===== Game Over ===== */
 .won-label {
   margin: 0;

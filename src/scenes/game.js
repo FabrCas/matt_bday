@@ -29,6 +29,14 @@ const BILLBOARD_IMAGES = CONFIG.billboards.images.length ? CONFIG.billboards.ima
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
 const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png"];
+const JUMP_SOUNDS = [
+  "salto base 1.mp3",
+  "salto base 2.mp3",
+  "salto forte 1.mp3",
+  "salto forte 2.mp3",
+  "salto greve 1.mp3",
+  "salto greve 2.mp3"
+]
 
 // Set di texture PBR per pavimento/muri (static/assets/imgs/tiles/).
 // "_gl" per la normal map: è la convenzione OpenGL (canale G verso l'alto),
@@ -38,6 +46,11 @@ const TILE_BASECOLOR = "tiles/ground_tiles_03_basecolor_1k.png";
 const TILE_NORMAL = "tiles/ground_tiles_03_normal_gl_1k.png";
 const TILE_AO = "tiles/ground_tiles_03_ambient_occlusion_1k.png";
 const TILE_ROUGHNESS = "tiles/ground_tiles_03_roughness_1k.png";
+
+const TILE_BASECOLOR_1 = "tiles/ground_tiles_24_baseColo_1k.png";
+const TILE_NORMAL_1 = "tiles/ground_tiles_24_height_1k.png";
+const TILE_AO_1 = "tiles/ground_tiles_24_ambientOcclusion_1k.png";
+const TILE_ROUGHNESS_1 = "tiles/ground_tiles_24_roughness_1k.png";
 // La height map non è usata: richiederebbe parallax occlusion mapping
 // (Babylon la legge dal canale alpha della normal map, che andrebbe
 // ricomposta a runtime unendo le due immagini) per un costo GPU per-pixel
@@ -45,6 +58,10 @@ const TILE_ROUGHNESS = "tiles/ground_tiles_03_roughness_1k.png";
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
+const MAX_LIVES = CONFIG.game.lives; // vite iniziali: un ostacolo colpito ne toglie una
+const HIT_INVULN_TIME = 3; // secondi di invulnerabilità dopo un colpo, evita di perdere più vite sullo stesso ostacolo
+const HIT_INVULN_ALPHA = 0.1; // trasparenza del player nella fase "trasparente" del lampeggio
+const HIT_BLINK_INTERVAL = 0.15; // secondi tra un cambio di trasparenza e l'altro durante l'invulnerabilità
 const LANES = G.lanes; // posizioni x delle 3 corsie
 const LANE_LERP = G.laneChangeSpeed; // velocità di cambio corsia
 const GRAVITY = G.gravity;
@@ -228,9 +245,10 @@ export async function createGameScene({ engine, canvas, goto }) {
   // CORRIDOR_HALF_WIDTH*2, lungo TILE_LEN; muri: larghi TILE_LEN, alti
   // WALL_HEIGHT) assumendo una tile ~2 unità di mondo per ripetizione:
   // aggiustare qui se la texture risulta troppo piccola/grande a schermo.
-  const groundMat = makeTiledPbrMaterial("groundMat", TILE_LEN / 2, WALL_HEIGHT / 2);
+  const repeat_factor = 6;
+  const groundMat = makeTiledPbrMaterial("groundMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
 
-  const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / 2, WALL_HEIGHT / 2);
+  const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / repeat_factorgi, WALL_HEIGHT / repeat_factor);
   wallMat.backFaceCulling = false;
 
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
@@ -269,6 +287,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   let soundtrack = null;
   loadSound("soundtrack_game.mp3", { volume: 0.6 , loop: true}).then((s) => {
     soundtrack = s;
+  });
+
+  // Un suono di salto scelto a caso tra JUMP_SOUNDS ad ogni salto (vedi
+  // jump() più sotto), invece di ripetere sempre lo stesso file.
+  const jumpSfx = [];
+  JUMP_SOUNDS.forEach((file) => {
+    loadSound(file, { volume: 0.8 }).then((s) => {
+      jumpSfx.push(s);
+    });
   });
 
   // ---- Player (modello importato) ----
@@ -326,7 +353,25 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
   fixImportedMaterials(playerMeshes);
 
-
+  // Trasparenza del player durante l'invulnerabilità (vedi update()): serve
+  // più di `mesh.visibility` da solo, perché fixImportedMaterials forza
+  // `transparencyMode = OPAQUE` per correggere l'export glb — e con
+  // transparencyMode impostato esplicitamente Babylon ignora del tutto
+  // `visibility`/`alpha` nel decidere se applicare l'alpha blending
+  // (Material.needAlphaBlendingForMesh ritorna in base al solo
+  // transparencyMode quando è stato impostato). Va quindi commutato ad
+  // ALPHABLEND mentre si vuole l'effetto, e riportato a OPAQUE altrimenti.
+  function setPlayerAlpha(alpha) {
+    const blend = alpha < 1;
+    for (const m of playerMeshes) {
+      const mat = m.material;
+      if (!mat) continue;
+      if (mat.transparencyMode !== undefined) {
+        mat.transparencyMode = blend ? PBRMaterial.PBRMATERIAL_ALPHABLEND : PBRMaterial.PBRMATERIAL_OPAQUE;
+      }
+      if (mat.alpha !== undefined) mat.alpha = alpha;
+    }
+  }
 
   // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
   // Larghezza pari alla distanza tra i due muri, così il pavimento li tocca
@@ -648,6 +693,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     speed: START_SPEED,
     distance: 0,
     coins: 0,
+    lives: MAX_LIVES,
+    invulnerableTimer: 0, // >0 dopo un colpo: ignora altre collisioni per HIT_INVULN_TIME secondi
     laneIndex: 1,
     targetX: LANES[1],
     velY: 0,
@@ -719,6 +766,9 @@ export async function createGameScene({ engine, canvas, goto }) {
     if (state.grounded) {
       state.velY = JUMP_SPEED;
       state.grounded = false;
+      if (jumpSfx.length) {
+        jumpSfx[Math.floor(Math.random() * jumpSfx.length)]?.play();
+      }
     }
   }
   // Discesa rapida: solo mentre si è in aria (in salto), forza una velocità
@@ -785,6 +835,22 @@ export async function createGameScene({ engine, canvas, goto }) {
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointerup", onPointerUp);
 
+  // Un ostacolo colpito toglie una vita invece di terminare subito la
+  // partita: l'ostacolo viene disattivato (niente colpo doppio dallo stesso)
+  // e per HIT_INVULN_TIME secondi le altre collisioni vengono ignorate,
+  // altrimenti più frame consecutivi sulla stessa hitbox (o ostacoli molto
+  // ravvicinati) farebbero perdere più vite per un singolo passaggio.
+  function hitObstacle(ob) {
+    ob.active = false;
+    ob.mesh.setEnabled(false);
+    state.invulnerableTimer = HIT_INVULN_TIME;
+    state.lives -= 1;
+    ui.flashHit();
+    if (state.lives <= 0) {
+      gameOver();
+    }
+  }
+
   // ===== Fine partita =====
   function gameOver() {
     if (!state.running) return;
@@ -807,7 +873,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   await scene.whenReadyAsync(true);
 
   ui.show("hud");
-  ui.updateHud({ coins: 0, distance: 0 });
+  ui.updateHud({ coins: 0, distance: 0, lives: state.lives, maxLives: MAX_LIVES });
 
   // ===== Loop =====
   function update(dt) {
@@ -915,6 +981,19 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
 
+    // Invulnerabilità temporanea dopo un colpo (vedi hitObstacle()): il
+    // player lampeggia tra opaco e semi-trasparente, feedback visivo che
+    // rende evidente che i colpi in questa finestra non contano.
+    if (state.invulnerableTimer > 0) {
+      state.invulnerableTimer -= dt;
+      if (state.invulnerableTimer > 0) {
+        const blinkOn = Math.floor(state.invulnerableTimer / HIT_BLINK_INTERVAL) % 2 === 0;
+        setPlayerAlpha(blinkOn ? 1 : HIT_INVULN_ALPHA);
+      } else {
+        setPlayerAlpha(1);
+      }
+    }
+
     // Ostacoli e monete: scorrono verso il player.
     const px = player.position.x;
     const py = player.position.y;
@@ -925,9 +1004,14 @@ export async function createGameScene({ engine, canvas, goto }) {
       // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
       ob.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - ob.mesh.position.z) / FADE_DISTANCE));
       // Collisione: vicino in z, stessa corsia, player non abbastanza in alto.
-      if (Math.abs(ob.mesh.position.z) < 0.9 && Math.abs(ob.mesh.position.x - px) < 1.0 && py < 1.6) {
-        gameOver();
-        return;
+      if (
+        state.invulnerableTimer <= 0 &&
+        Math.abs(ob.mesh.position.z) < 0.9 &&
+        Math.abs(ob.mesh.position.x - px) < 1.0 &&
+        py < 1.6
+      ) {
+        hitObstacle(ob);
+        if (!state.running) return;
       }
       if (ob.mesh.position.z < DESPAWN_BEHIND) {
         ob.active = false;
@@ -961,7 +1045,12 @@ export async function createGameScene({ engine, canvas, goto }) {
     state.nextSpawnZ -= move;
     while (state.nextSpawnZ < SPAWN_AHEAD) spawnRow();
 
-    ui.updateHud({ coins: state.coins * CONFIG.economy.coinValue, distance: state.distance });
+    ui.updateHud({
+      coins: state.coins * CONFIG.economy.coinValue,
+      distance: state.distance,
+      lives: state.lives,
+      maxLives: MAX_LIVES,
+    });
   }
 
   function dispose() {
@@ -971,6 +1060,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     disposeSound(coinSfx);
     disposeSound(coinredSfx);
     disposeSound(soundtrack);
+    jumpSfx.forEach(disposeSound);
     disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });
     scene.dispose();
   }

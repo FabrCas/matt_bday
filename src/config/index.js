@@ -11,6 +11,7 @@ const defaults = {
     subtitle: "",
     allowReplay: true,
     wishesMessage: "",
+    lives: 3, // ogni ostacolo colpito ne toglie una; a 0 si va a game over
   },
   economy: {
     currencySymbol: "€",

@@ -27,14 +27,18 @@
     <div id="menu" class="overlay hidden">
         <h1 class="title" id="menu-title">Placeholder</h1>
         <p class="subtitle" id="menu-subtitle">Placeholder</p>
-        <button id="btn-play" class="btn">GIOCA</button>
+        <button id="btn-play" class="btn">Play</button>
     </div>
 
     <!-- HUD in-game -->
     <div id="hud" class="hud hidden">
+        <div class="hud-item" id="hud-lives"></div>
         <div class="hud-item">🪙 <span id="hud-coins">0</span></div>
         <div class="hud-item">📏 <span id="hud-distance">0</span> m</div>
     </div>
+
+    <!-- Flash rosso a schermo intero al momento di un colpo (vedi ui.flashHit()) -->
+    <div id="hit-flash"></div>
 
     <!-- Game Over -->
     <div id="gameover" class="overlay hidden">
