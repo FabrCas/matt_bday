@@ -28,16 +28,28 @@ export function createControlsScene({ engine, goto }) {
 
   let elapsed = 0;
   let advancing = false; // guardia: evita chiamate goto() multiple se update() gira ancora un frame di troppo
+  function goToGame() {
+    if (advancing) return;
+    advancing = true;
+    goto("game");
+  }
+
+  // Bottone "salta": passa subito al gioco senza aspettare il countdown.
+  // Listener locale a questa scena (non passa da ui.bindButtons, che è
+  // pensato per binding unici sull'intera vita dell'app) — va quindi tolto
+  // in dispose() per non accumularne uno nuovo ad ogni volta che si passa
+  // di qui.
+  const btnSkip = document.getElementById("btn-skip-controls");
+  btnSkip.addEventListener("click", goToGame);
+
   function update(dt) {
     elapsed += dt;
     ui.updateControlsCountdown(Math.max(0, CONTROLS_DURATION - elapsed));
-    if (!advancing && elapsed >= CONTROLS_DURATION) {
-      advancing = true;
-      goto("game");
-    }
+    if (elapsed >= CONTROLS_DURATION) goToGame();
   }
 
   function dispose() {
+    btnSkip.removeEventListener("click", goToGame);
     scene.dispose();
   }
 
