@@ -639,13 +639,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     const dir = Math.random() < 0.5 ? 1 : -1; // sinistra→destra o il contrario, a caso
     fogState.mat = fogMats[Math.floor(Math.random() * fogMats.length)];
 
-    if (fogState.mat.file == "ghost_max.png"){
-      setTimeout(() => {
-        soundghostmax?.play();
-      }, 3000);
-      
-      
-    } 
+    if (fogState.mat.file == "ghost_max.png") {
+      // L'Audio Engine v2 di Babylon non accetta i secondi come argomento
+      // diretto di play(): il ritardo va passato nell'oggetto opzioni
+      // (waitTime), programmato sul clock dell'AudioContext — a differenza
+      // di setTimeout non rischia di restare "agganciato" a un Sound già
+      // rilasciato se la scena cambia nel frattempo.
+      soundghostmax?.play({ waitTime: 3 });
+    }
 
     fogWisp.material = fogState.mat.material;
     // Distanza casuale (non più fissa) tra FOG_WALL_Z_MIN e FOG_WALL_Z_MAX:
@@ -792,8 +793,11 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   // ---- Tipologie di ostacoli ----
   // Ognuna definisce come costruire la mesh (colonne = più cubi uniti in
-  // un'unica mesh con Mesh.MergeMeshes, non mesh separate) e l'ingombro da
-  // usare nella collisione: metà larghezza sull'asse X (o "spanAllLanes" se
+  // ogni cubo, mesh figlie di un nodo radice "vuoto" — non con
+  // Mesh.MergeMeshes, che ricentra i vertici sul primo elemento
+  // dell'array anziché conservarne le posizioni assolute, spostando/
+  // affondando la geometria in modo imprevedibile) e l'ingombro da usare
+  // nella collisione: metà larghezza sull'asse X (o "spanAllLanes" se
   // copre tutte le corsie) e l'altezza oltre la quale il salto la supera.
   const OBSTACLE_CUBE_SIZE = 1.4;
   const OBSTACLE_BASE_Y = OBSTACLE_CUBE_SIZE / 2; // centro del cubo poggiato a terra
@@ -805,30 +809,38 @@ export async function createGameScene({ engine, canvas, goto }) {
     return o;
   }
 
+  // Nodo radice senza geometria propria: sposteremo solo lui (x/z) per far
+  // scorrere/riposizionare l'ostacolo, i cubi figli restano fissi nelle loro
+  // posizioni locali (root.position.y resta sempre 0).
+  function makeCubeGroup(name, offsets) {
+    const root = new Mesh(name, scene);
+    for (const [i, [ox, oy, oz]] of offsets.entries()) {
+      const b = MeshBuilder.CreateBox(name + "_p" + i, { size: OBSTACLE_CUBE_SIZE }, scene);
+      b.material = obstacleMat;
+      b.parent = root;
+      b.position.set(ox, oy, oz);
+    }
+    return root;
+  }
+
   // Colonna verticale: 3 cubi impilati, troppo alta per saltarci sopra —
   // come un cubo singolo costringe a cambiare corsia, ma rompe la
   // monotonia visiva di vederne sempre e solo uno identico.
   function makeColumnVMesh(name) {
-    const parts = [0, 1, 2].map((i) => {
-      const b = MeshBuilder.CreateBox(name + "_p" + i, { size: OBSTACLE_CUBE_SIZE }, scene);
-      b.material = obstacleMat;
-      b.position.y = OBSTACLE_BASE_Y + i * OBSTACLE_CUBE_SIZE;
-      return b;
-    });
-    return Mesh.MergeMeshes(parts, true, true, undefined, false, true);
+    return makeCubeGroup(
+      name,
+      [0, 1, 2].map((i) => [0, OBSTACLE_BASE_Y + i * OBSTACLE_CUBE_SIZE, 0])
+    );
   }
 
   // Colonna orizzontale: 3 cubi affiancati alla stessa altezza di un cubo
   // singolo (quindi saltabile), ma larga abbastanza da coprire tutte le
   // corsie — costringe a saltare invece che a cambiare corsia.
   function makeColumnHMesh(name) {
-    const parts = [-1, 0, 1].map((i) => {
-      const b = MeshBuilder.CreateBox(name + "_p" + i, { size: OBSTACLE_CUBE_SIZE }, scene);
-      b.material = obstacleMat;
-      b.position.set(i * OBSTACLE_CUBE_SIZE, OBSTACLE_BASE_Y, 0);
-      return b;
-    });
-    return Mesh.MergeMeshes(parts, true, true, undefined, false, true);
+    return makeCubeGroup(
+      name,
+      [-1, 0, 1].map((i) => [i * OBSTACLE_CUBE_SIZE, OBSTACLE_BASE_Y, 0])
+    );
   }
 
   // "weight" pesa la probabilità di scelta in pickObstacleType(): il cubo
@@ -924,7 +936,12 @@ export async function createGameScene({ engine, canvas, goto }) {
         ob.lane = obsLane;
         ob.mesh.setEnabled(true);
         ob.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
-        ob.mesh.position.x = LANES[obsLane];
+        // I tipi "spanAllLanes" vanno sempre centrati (x=0): la collisione
+        // li considera comunque un blocco su tutte e 3 le corsie, quindi
+        // devono anche visivamente coprirle simmetricamente — su una corsia
+        // casuale coprirebbero solo 2 corsie lasciandone una scoperta pur
+        // colpendo comunque chi ci passa (esattamente il bug segnalato).
+        ob.mesh.position.x = obsType.spanAllLanes ? 0 : LANES[obsLane];
         ob.mesh.position.z = state.nextSpawnZ;
       }
     }
