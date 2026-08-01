@@ -642,7 +642,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     if (fogState.mat.file == "ghost_max.png"){
       setTimeout(() => {
         soundghostmax?.play();
-      }, 1000);
+      }, 3000);
       
       
     } 

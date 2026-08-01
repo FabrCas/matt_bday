@@ -10,6 +10,7 @@ import {
 } from "@babylonjs/core";
 import * as ui from "../ui/ui.js";
 import { getCameraProfile_menu } from "../utils/responsive.js";
+import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Scena Game Over: mostra la vincita (overlay HTML) su sfondo 3D sobrio.
 export function createGameOverScene({ engine, payload = {} }) {
@@ -26,6 +27,11 @@ export function createGameOverScene({ engine, payload = {} }) {
   const light = new HemisphericLight("goLight", new Vector3(0.2, 1, 0.3), scene);
   light.intensity = 0.9;
 
+  let soundwow = null;
+  loadSound("wow_gameover.mp3", { volume: 0.7 , loop: false}).then((s) => {
+    soundwow = s;
+  });
+
   // Moneta gigante che ruota a celebrare la vincita.
   const coin = MeshBuilder.CreateCylinder("bigCoin", { diameter: 2.4, height: 0.3, tessellation: 24 }, scene);
   const mat = new StandardMaterial("bigCoinMat", scene);
@@ -37,6 +43,10 @@ export function createGameOverScene({ engine, payload = {} }) {
   
   ui.show("gameover");
   ui.updateGameOver({ coins, distance, amount, message});
+
+  setTimeout(() => {
+    soundwow?.play();
+  }, 1000);
 
   function update(dt) {
     coin.rotation.y += dt * 1.5;
