@@ -52,6 +52,7 @@ const defaults = {
     quietStretchChance: 0.05,  // probabilità per riga di avviare una pausa senza spawn
     quietStretchMinRows: 2,
     quietStretchMaxRows: 4,
+    extraWideBlockGap: 18, // distanza extra prima di un 3° blocco orizzontale consecutivo
   },
 };
 

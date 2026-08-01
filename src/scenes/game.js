@@ -936,6 +936,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     nextSpawnZ: SPAWN_AHEAD,
     fogTime: 0, // orologio indipendente dalla velocità, per il moto dei banchi di nebbia
     quietRowsRemaining: 0, // >0: righe senza spawn ancora da consumare, vedi spawnRow()
+    consecutiveWideBlocks: 0, // blocchi orizzontali (2-3 corsie) piazzati di fila senza interruzioni, vedi spawnRow()
   };
 
   function spawnRow() {
@@ -943,12 +944,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     // gioco invece di un flusso costante e ripetitivo di ostacoli/monete.
     if (state.quietRowsRemaining > 0) {
       state.quietRowsRemaining -= 1;
+      state.consecutiveWideBlocks = 0;
       state.nextSpawnZ += ROW_GAP;
       return;
     }
     if (Math.random() < G.quietStretchChance) {
       state.quietRowsRemaining =
         G.quietStretchMinRows + Math.floor(Math.random() * (G.quietStretchMaxRows - G.quietStretchMinRows + 1));
+      state.consecutiveWideBlocks = 0;
       state.nextSpawnZ += ROW_GAP;
       return;
     }
@@ -966,6 +969,20 @@ export async function createGameScene({ engine, canvas, goto }) {
     const obsCenterX = (LANES[startLane] + LANES[startLane + obsType.laneSpan - 1]) / 2;
 
     if (Math.random() < G.obstacleSpawnChance) {
+      const isWideBlock = obsType.laneSpan >= 2;
+      if (isWideBlock) {
+        if (state.consecutiveWideBlocks >= 2) {
+          // Sarebbe il terzo blocco orizzontale consecutivo: nemmeno il
+          // doppio salto basta a superarli così ravvicinati uno via l'altro.
+          // Spazio extra prima di piazzarlo, poi si riconta da qui.
+          state.nextSpawnZ += G.extraWideBlockGap;
+          state.consecutiveWideBlocks = 0;
+        }
+        state.consecutiveWideBlocks += 1;
+      } else {
+        state.consecutiveWideBlocks = 0;
+      }
+
       const ob = spawnFrom(obstaclesByType[obsType.id]);
       if (ob) {
         ob.active = true;
@@ -975,6 +992,8 @@ export async function createGameScene({ engine, canvas, goto }) {
         ob.mesh.position.x = obsCenterX;
         ob.mesh.position.z = state.nextSpawnZ;
       }
+    } else {
+      state.consecutiveWideBlocks = 0; // riga senza ostacolo: la sequenza si interrompe
     }
 
     // Corsie libere (non coperte dall'ostacolo di questa riga): monete e

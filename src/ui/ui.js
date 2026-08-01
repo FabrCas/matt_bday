@@ -26,7 +26,8 @@ const els = {
   hitFlash: document.getElementById("hit-flash"),
   controlsCountdown: document.getElementById("controls-countdown"),
   controlsLives: document.getElementById("controls-lives"),
-  controlsCoinMultiplier: document.getElementById("controls-coin-multiplier"),
+  controlsCoinValue: document.getElementById("controls-coin-value"),
+  controlsRedCoinValue: document.getElementById("controls-red-coin-value"),
 };
 
 // Applica titolo/sottotitolo dalla config statica (una volta all'avvio).
@@ -67,11 +68,14 @@ export function updateControlsCountdown(secondsLeft) {
   els.controlsCountdown.textContent = Math.ceil(secondsLeft);
 }
 
-// Vite e moltiplicatore della moneta rossa letti dalla config statica, non
-// scritti a mano nell'HTML: restano sempre allineati ai valori reali di gioco.
+// Vite e valore in euro delle monete letti dalla config statica, non scritti
+// a mano nell'HTML: restano sempre allineati ai valori reali di gioco.
 export function updateControlsInfo() {
   els.controlsLives.textContent = CONFIG.game.lives;
-  els.controlsCoinMultiplier.textContent = CONFIG.gameplay.redCoinValueMultiplier;
+  els.controlsCoinValue.textContent = formatMoney(CONFIG.economy.coinValue);
+  els.controlsRedCoinValue.textContent = formatMoney(
+    CONFIG.economy.coinValue * CONFIG.gameplay.redCoinValueMultiplier
+  );
 }
 
 // Flash rosso a schermo intero al momento di un colpo (vedi hitObstacle() in

@@ -86,6 +86,11 @@ gameplay:
   redCoinChance: 0.02     # probabilità (0..1) che una fila generi una moneta rossa bonus
   redCoinValueMultiplier: 10 # valore della moneta rossa = coinValue * questo fattore
   obstacleSpawnChance: 0.85 # probabilità (0..1) che una riga generi un ostacolo (il resto delle righe ne è priva)
+  # Al massimo 2 blocchi orizzontali (2-3 corsie, quelli da saltare) di
+  # fila: un terzo consecutivo non sarebbe superabile nemmeno col doppio
+  # salto. Se capiterebbe, viene spaziato di questa distanza extra invece
+  # di comparire alla distanza normale.
+  extraWideBlockGap: 18
   # Pause brevi e periodiche senza alcuno spawn (né ostacoli né monete): a
   # ogni riga c'è quietStretchChance probabilità di avviarne una, lunga tra
   # quietStretchMinRows e quietStretchMaxRows righe.
