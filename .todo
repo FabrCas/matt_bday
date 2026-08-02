@@ -1,0 +1,12 @@
+- migliorare perfomance
+-- despawn degli oggetti subito dopo la z delle camera 
+-- compressione asset 2D
+- evitare spawn delle monete rosse sopra quelle gialle
+- includere i modelli degli ostacoli
+- fog asset flippati randomicamente su asse y
+- consumabili temporanei
+-- magnete: raccoglie tutte le monete
+-- martello spacca tutti gli ostacoli
+-- stella: invincibilita' per 30 S
+- aggiungere facce mancanti sull'ultima scena
+- ripensare la prima scena, aggiugnere base audio? 

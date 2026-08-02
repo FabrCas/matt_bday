@@ -30,8 +30,8 @@ const BILLBOARD_IMAGES = CONFIG.billboards.images.length ? CONFIG.billboards.ima
 
 // Sprite di nebbia (static/assets/imgs/), combinati su più piani per un banco
 // di nebbia con movimento organico invece di una singola texture statica.
-// const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png", "ghost_max.png"];
-const FOG_TEXTURES = ["ghost_max.png"];
+const FOG_TEXTURES = ["fog_0.png", "fog_1.png", "fog_2.png", "face_0.png", "ghost_max.png"];
+// const FOG_TEXTURES = ["ghost_max.png"];
 const JUMP_SOUNDS = [
   "salto base 1.mp3",
   "salto base 2.mp3",
@@ -651,7 +651,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       // (waitTime), programmato sul clock dell'AudioContext — a differenza
       // di setTimeout non rischia di restare "agganciato" a un Sound già
       // rilasciato se la scena cambia nel frattempo.
-      soundghostmax?.play({ waitTime: 3 });
+      soundghostmax?.play({ waitTime: 2 });
     }
 
     fogWisp.material = fogState.mat.material;
