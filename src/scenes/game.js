@@ -69,6 +69,7 @@ const MAX_LIVES = CONFIG.game.lives; // vite iniziali: un ostacolo colpito ne to
 const HIT_INVULN_TIME = 3; // secondi di invulnerabilità dopo un colpo, evita di perdere più vite sullo stesso ostacolo
 const HIT_INVULN_ALPHA = 0.1; // trasparenza del player nella fase "trasparente" del lampeggio
 const HIT_BLINK_INTERVAL = 0.15; // secondi tra un cambio di trasparenza e l'altro durante l'invulnerabilità
+const STAR_BLINK_INTERVAL = 0.15; // secondi tra un'accensione/spegnimento del bagliore durante la stella (stesso stile del lampeggio da colpo)
 const LANES = G.lanes; // posizioni x delle 3 corsie
 const LANE_LERP = G.laneChangeSpeed; // velocità di cambio corsia
 const GRAVITY = G.gravity;
@@ -1592,16 +1593,18 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
 
-    // Invincibilità da power-up stella (vedi activatePowerup()): a
-    // differenza dell'invulnerabilità da colpo, nessun lampeggio (non è un
-    // segnale di "appena colpito"), solo il conto alla rovescia mostrato in
-    // HUD più sotto. Il ripristino (tema stella/soundtrack/bagliore) va
-    // fatto una sola volta, esattamente nel frame in cui il timer arriva a
-    // 0 — non ad ogni frame in cui è già a 0, altrimenti soundtrack.play()
-    // ripartirebbe da capo in continuazione per tutta la partita.
+    // Invincibilità da power-up stella (vedi activatePowerup()): il
+    // bagliore lampeggia acceso/spento (stesso stile del lampeggio da
+    // colpo, vedi invulnerableTimer sopra) invece di restare fisso, così si
+    // legge a colpo d'occhio che l'effetto è ancora attivo. Il ripristino
+    // (tema stella/soundtrack/bagliore) va fatto una sola volta, esattamente
+    // nel frame in cui il timer arriva a 0 — non ad ogni frame in cui è già
+    // a 0, altrimenti soundtrack.resume() ripartirebbe in continuazione.
     const starWasActive = state.starTimer > 0;
     if (starWasActive) {
       state.starTimer = Math.max(0, state.starTimer - dt);
+      const starBlinkOn = Math.floor(state.starTimer / STAR_BLINK_INTERVAL) % 2 === 0;
+      setPlayerGlow(starBlinkOn);
     }
     if (starWasActive && state.starTimer <= 0) {
       soundpowerupstart?.stop();
