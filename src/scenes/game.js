@@ -331,7 +331,7 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   const coinMat = new StandardMaterial("coinMat", scene);
   coinMat.emissiveColor = new Color3(0.55, 0.42, 0.06);
-  coinMat.diffuseColor = new Color3(0.2/5, 0.15/5, 0.03/5);
+  coinMat.diffuseColor = new Color3(0.2/3, 0.15/3, 0.03/3);
   coinMat.specularColor = new Color3(0, 0, 0);
   coinMat.maxSimultaneousLights = MAX_LIGHTS;
 
