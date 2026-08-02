@@ -1,10 +1,10 @@
-- migliorare perfomance
+-ok migliorare perfomance
 --ok despawn degli oggetti subito dopo la z delle camera 
--- compressione asset 2D
+--ok compressione asset 2D
 -ok  evitare spawn delle monete rosse sopra quelle gialle
 - includere i modelli degli ostacoli
-- fog asset flippati randomicamente su asse y
-- consumabili temporanei
+-ok fog asset flippati randomicamente su asse y
+- consumabili temporanei (aggiornare tutorial)
 -- magnete: raccoglie tutte le monete
 -- martello spacca tutti gli ostacoli
 -- stella: invincibilita' per 30 S
@@ -12,5 +12,5 @@
 - ripensare la prima scena, aggiugnere base audio? 
 - aggiungere altre texture nel percorso
 - aggiungere tipologie di ostacoli solo dopo una certa distanza
-- centrare testo game over
--- sonic effect quando per abbassarti
+-ok centrare testo game over
+-- sonic effect quando per abbassarti (aggiornare tutorial)
