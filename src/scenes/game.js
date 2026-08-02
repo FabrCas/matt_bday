@@ -85,7 +85,11 @@ const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete a
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
 const WALL_HEIGHT = 10;
 // ---- Power-up temporanei (vedi CONFIG.powerups) ----
-// magnete: raccoglie subito tutte le monete attive in pista.
+// magnete: per MAGNET_DURATION secondi, tutte le monete attive in pista
+// vengono attratte verso il giocatore (a MAGNET_ATTRACT_SPEED unità/s)
+// invece di scorrere normalmente sul binario; la raccolta avviene come
+// effetto successivo, quando l'attrazione le porta abbastanza vicine (stesso
+// controllo di collisione della raccolta "a piedi").
 // martello: distrugge subito tutti gli ostacoli attivi in pista, poi
 // sospende la generazione di nuovi ostacoli per HAMMER_NO_OBSTACLE_DURATION
 // secondi (altrimenti uno nuovo potrebbe comparire a distanza di sicurezza
@@ -101,6 +105,8 @@ const POWERUP_TYPES = [
 ];
 const HAMMER_NO_OBSTACLE_DURATION = CONFIG.powerups.hammer.noObstacleDuration;
 const STAR_DURATION = CONFIG.powerups.star.duration;
+const MAGNET_DURATION = CONFIG.powerups.magnet.duration;
+const MAGNET_ATTRACT_SPEED = CONFIG.powerups.magnet.attractSpeed;
 // ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
 // Placeholder: in seguito il box verrà sostituito da un modello importato.
 // Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
@@ -1063,6 +1069,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     invulnerableTimer: 0, // >0 dopo un colpo: ignora altre collisioni per HIT_INVULN_TIME secondi
     starTimer: 0, // >0 dopo la stella: ignora le collisioni con gli ostacoli per STAR_DURATION secondi
     hammerNoObstacleTimer: 0, // >0 dopo il martello: nessun nuovo ostacolo per HAMMER_NO_OBSTACLE_DURATION secondi
+    magnetTimer: 0, // >0 dopo il magnete: le monete attive vengono attratte verso il giocatore per MAGNET_DURATION secondi
     laneIndex: 1,
     targetX: LANES[1],
     velY: 0,
@@ -1328,24 +1335,18 @@ export async function createGameScene({ engine, canvas, goto }) {
     }
   }
 
-  // Effetto immediato al raccoglimento di un power-up (vedi loop dei
-  // power-up in update()): magnete e martello agiscono una tantum su tutto
-  // ciò che è attivo in pista in quel momento, la stella avvia/rinnova un
-  // timer di invincibilità.
+  // Effetto al raccoglimento di un power-up (vedi loop dei power-up in
+  // update()): il martello agisce una tantum su tutto ciò che è attivo in
+  // pista in quel momento, magnete e stella avviano/rinnovano un timer che
+  // produce il loro effetto nel tempo (vedi rispettivamente il loop delle
+  // monete e il guard sulle collisioni ostacoli in update()).
   function activatePowerup(kind) {
     powerupSfx?.play();
     if (kind === "magnet") {
-      // Raccoglie tutte le monete (gialle e rosse) attualmente attive in
-      // pista, come se il player le avesse toccate una per una.
-      let collected = 0;
-      for (const co of coins) {
-        if (!co.active) continue;
-        co.active = false;
-        co.mesh.setEnabled(false);
-        state.coins += co.value;
-        collected += 1;
-      }
-      if (collected > 0) coinSfx?.play();
+      // Non raccoglie subito: avvia/rinnova solo il timer di attrazione,
+      // la raccolta vera e propria avviene nel loop monete di update() man
+      // mano che l'attrazione le porta a contatto col giocatore.
+      state.magnetTimer = MAGNET_DURATION;
     } else if (kind === "hammer") {
       // Distrugge tutti gli ostacoli attualmente attivi in pista, senza
       // alcuna perdita di vite (non passa da hitObstacle()), poi sospende
@@ -1550,10 +1551,17 @@ export async function createGameScene({ engine, canvas, goto }) {
     if (state.hammerNoObstacleTimer > 0) {
       state.hammerNoObstacleTimer = Math.max(0, state.hammerNoObstacleTimer - dt);
     }
+    // Attrazione da power-up magnete (vedi activatePowerup() e il loop
+    // monete più sotto, che usa questo timer per decidere se muoverle verso
+    // il giocatore invece che scorrere normalmente).
+    if (state.magnetTimer > 0) {
+      state.magnetTimer = Math.max(0, state.magnetTimer - dt);
+    }
 
     // Ostacoli e monete: scorrono verso il player.
     const px = player.position.x;
     const py = player.position.y;
+    const pz = player.position.z;
 
     for (const ob of obstacles) {
       if (!ob.active) continue;
@@ -1583,7 +1591,24 @@ export async function createGameScene({ engine, canvas, goto }) {
 
     for (const co of coins) {
       if (!co.active) continue;
-      co.mesh.position.z -= move;
+      if (state.magnetTimer > 0) {
+        // Attratta verso il giocatore invece di scorrere sul binario: si
+        // muove in linea retta verso la sua posizione attuale, alla
+        // velocità configurata. La raccolta (sotto) resta lo stesso
+        // controllo di prossimità di sempre: quando l'attrazione la porta
+        // abbastanza vicina, viene raccolta come se il player l'avesse
+        // sfiorata camminando.
+        const dx = px - co.mesh.position.x;
+        const dy = py - co.mesh.position.y;
+        const dz = pz - co.mesh.position.z;
+        const dist = Math.hypot(dx, dy, dz) || 1;
+        const step = Math.min(dist, MAGNET_ATTRACT_SPEED * dt);
+        co.mesh.position.x += (dx / dist) * step;
+        co.mesh.position.y += (dy / dist) * step;
+        co.mesh.position.z += (dz / dist) * step;
+      } else {
+        co.mesh.position.z -= move;
+      }
       co.mesh.rotation.x += dt * 6; // rotazione moneta
       co.mesh.rotation.y += 0.1; // rotazione secondaria, stesso incremento per frame di prima
       // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.

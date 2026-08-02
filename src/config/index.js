@@ -35,6 +35,8 @@ const defaults = {
   powerups: {
     magnet: {
       spawnChance: 0.02, // probabilità (0..1) per riga
+      duration: 6,       // secondi in cui le monete vengono attratte verso il giocatore
+      attractSpeed: 18,  // velocità (unità/s) di attrazione verso il giocatore
     },
     hammer: {
       spawnChance: 0.02,       // probabilità (0..1) per riga

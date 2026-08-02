@@ -66,8 +66,10 @@ billboards:
 # rossa): con tutte le probabilità di default può quindi capitare più di un
 # power-up nella stessa riga (su corsie diverse).
 powerups:
-  magnet:               # 🧲 raccoglie subito tutte le monete attive in pista
+  magnet:               # 🧲 attrae verso il giocatore tutte le monete attive in pista (poi raccolte al contatto)
     spawnChance: 0.02   # probabilità (0..1) per riga
+    duration: 6         # secondi in cui le monete vengono attratte verso il giocatore
+    attractSpeed: 18    # velocità (unità/s) con cui le monete si muovono verso il giocatore mentre sono attratte
   hammer:                # 🔨 distrugge subito tutti gli ostacoli attivi in pista
     spawnChance: 0.02    # probabilità (0..1) per riga
     noObstacleDuration: 5  # secondi dopo l'uso in cui non vengono generati nuovi ostacoli
