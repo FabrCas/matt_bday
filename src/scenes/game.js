@@ -420,8 +420,13 @@ export async function createGameScene({ engine, canvas, goto }) {
   });
 
   let soundghostmax = null;
-  loadSound("crying_ghot_max.mp3", { volume: 0.7 , loop: false}).then((s) => {
+  loadSound("crying_ghost_max.mp3", { volume: 0.7 , loop: false}).then((s) => {
     soundghostmax = s;
+  });
+
+  let soundpowerupstart = null;
+  loadSound("mario_star.mp3", { volume: 0.7 , loop: true}).then((s) => {
+    soundpowerupstart = s;
   });
 
   // Un suono di salto scelto a caso tra JUMP_SOUNDS ad ogni salto (vedi
@@ -1341,12 +1346,13 @@ export async function createGameScene({ engine, canvas, goto }) {
   // produce il loro effetto nel tempo (vedi rispettivamente il loop delle
   // monete e il guard sulle collisioni ostacoli in update()).
   function activatePowerup(kind) {
-    powerupSfx?.play();
+    
     if (kind === "magnet") {
       // Non raccoglie subito: avvia/rinnova solo il timer di attrazione,
       // la raccolta vera e propria avviene nel loop monete di update() man
       // mano che l'attrazione le porta a contatto col giocatore.
       state.magnetTimer = MAGNET_DURATION;
+      powerupSfx?.play();
     } else if (kind === "hammer") {
       // Distrugge tutti gli ostacoli attualmente attivi in pista, senza
       // alcuna perdita di vite (non passa da hitObstacle()), poi sospende
@@ -1359,6 +1365,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         ob.mesh.setEnabled(false);
       }
       state.hammerNoObstacleTimer = HAMMER_NO_OBSTACLE_DURATION;
+      powerupSfx?.play();
     } else if (kind === "star") {
       // Invincibilità per STAR_DURATION secondi: vedi il guard su
       // state.starTimer nel controllo di collisione ostacoli più sotto.
@@ -1366,6 +1373,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       // così raccoglierne una seconda mentre la prima è ancora attiva non
       // dà un'invincibilità sproporzionatamente lunga.
       state.starTimer = STAR_DURATION;
+      soundpowerupstart?.play();
     }
   }
 
@@ -1544,6 +1552,9 @@ export async function createGameScene({ engine, canvas, goto }) {
     // HUD più sotto.
     if (state.starTimer > 0) {
       state.starTimer = Math.max(0, state.starTimer - dt);
+    }
+    else {
+      soundpowerupstart?.stop();
     }
     // Pausa post-martello (vedi activatePowerup()/spawnRow()): nessun
     // feedback HUD dedicato, la si nota semplicemente dall'assenza di
