@@ -74,7 +74,7 @@ powerups:
     spawnChance: 0.02    # probabilità (0..1) per riga
     noObstacleDuration: 8 # secondi dopo l'uso in cui non vengono generati nuovi ostacoli
   star:                  # ⭐ invincibilità: ignora le collisioni con gli ostacoli
-    spawnChance: 0.25    # probabilità (0..1) per riga
+    spawnChance: 0.02    # probabilità (0..1) per riga
     duration: 10         # secondi di invincibilità
 
 # --- Economia / vincita ---
