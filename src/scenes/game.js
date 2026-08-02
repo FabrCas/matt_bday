@@ -100,10 +100,15 @@ const WALL_HEIGHT = 10;
 // Ogni tipo ha probabilità di spawn indipendente (vedi spawnRow()): con
 // tutte le probabilità di default può capitare più di un power-up sulla
 // stessa riga, su corsie diverse.
+// yOffset: correzione verticale rispetto alla stessa quota di monete/altri
+// power-up (vedi spawnRow()), utile per il magnete se il pivot del modello
+// importato non è centrato come le mesh procedurali di monete/martello/
+// stella (che sono centrate per costruzione). Calibrare a occhio una volta
+// visto in gioco; 0 = nessuna correzione, stessa quota esatta degli altri.
 const POWERUP_TYPES = [
-  { kind: "magnet", spawnChance: CONFIG.powerups.magnet.spawnChance },
-  { kind: "hammer", spawnChance: CONFIG.powerups.hammer.spawnChance },
-  { kind: "star", spawnChance: CONFIG.powerups.star.spawnChance },
+  { kind: "magnet", spawnChance: CONFIG.powerups.magnet.spawnChance, yOffset: 0 },
+  { kind: "hammer", spawnChance: CONFIG.powerups.hammer.spawnChance, yOffset: 0 },
+  { kind: "star", spawnChance: CONFIG.powerups.star.spawnChance, yOffset: 0 },
 ];
 const HAMMER_NO_OBSTACLE_DURATION = CONFIG.powerups.hammer.noObstacleDuration;
 const STAR_DURATION = CONFIG.powerups.star.duration;
@@ -1068,6 +1073,11 @@ export async function createGameScene({ engine, canvas, goto }) {
       false
     );
     const model = rootNodes[0];
+    // Stesso fix del player: l'import glTF spesso imposta rotationQuaternion
+    // sulla root, e quando presente Babylon ignora silenziosamente .rotation
+    // — senza azzerarlo, l'incremento di rotation.y nel loop dei power-up
+    // (update()) non avrebbe alcun effetto visibile.
+    model.rotationQuaternion = null;
     model.scaling.set(MAGNET_MODEL_SCALE, MAGNET_MODEL_SCALE, MAGNET_MODEL_SCALE);
     if (DEBUG) model.getChildMeshes().forEach((m) => (m.showBoundingBox = true));
     fixImportedMaterials(model.getChildMeshes());
@@ -1278,7 +1288,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         pu.lane = puLane;
         pu.mesh.setEnabled(true);
         pu.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
-        pu.mesh.position.set(LANES[puLane], 1.0, puZ);
+        pu.mesh.position.set(LANES[puLane], 1.0 + pt.yOffset, puZ);
       }
     }
 
