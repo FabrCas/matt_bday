@@ -536,15 +536,32 @@ export async function createGameScene({ engine, canvas, goto }) {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // Ostacoli: un materiale PBR per BLOCK_THEMES (stesso helper usato per
-  // pavimento/muri/soffitto), texture reale invece della tinta unita di
-  // prima. Repeat a 1 (nessuna ripetizione, texture stirata su tutta la
-  // faccia): i cubi degli ostacoli (OBSTACLE_CUBE_SIZE più sotto) sono
-  // piccoli rispetto alla scala a cui questi set sono pensati, un singolo
-  // tile per faccia risulta più leggibile di una ripetizione multipla.
+  // Ostacoli: un pool di materiali PBR per ciascun BLOCK_THEMES (stesso
+  // helper usato per pavimento/muri/soffitto), texture reale invece della
+  // tinta unita di prima. Repeat a 1 (nessuna ripetizione, texture stirata
+  // su tutta la faccia): i cubi degli ostacoli (OBSTACLE_CUBE_SIZE più
+  // sotto) sono piccoli rispetto alla scala a cui questi set sono pensati,
+  // un singolo tile per faccia risulta più leggibile di una ripetizione
+  // multipla.
+  // Più varianti per tema, ciascuna con la propria rotazione UV casuale
+  // (wAng, stesso trucco di buildSurfaceThemeMats): senza, tutti gli
+  // ostacoli con lo stesso tema mostrerebbero la texture nello stesso
+  // identico orientamento, risultando visivamente troppo uniformi. Ogni
+  // ostacolo è ormai un'unica mesh fusa (vedi makeCubeGroup), quindi
+  // assegnare una variante per ostacolo garantisce automaticamente che i
+  // "blocchi" che lo compongono condividano la stessa rotazione.
   const BLOCK_REPEAT = 1;
-  const blockMats = BLOCK_THEMES.map((theme) =>
-    makeTiledPbrMaterial(`obstacleMat_${theme.name}`, BLOCK_REPEAT, BLOCK_REPEAT, theme.files)
+  const BLOCK_MAT_VARIANTS = 6;
+  const blockMatsByTheme = BLOCK_THEMES.map((theme) =>
+    Array.from({ length: BLOCK_MAT_VARIANTS }, (_, i) => {
+      const mat = makeTiledPbrMaterial(`obstacleMat_${theme.name}_${i}`, BLOCK_REPEAT, BLOCK_REPEAT, theme.files);
+      const wAng = Math.random() * Math.PI * 2;
+      mat.albedoTexture.wAng = wAng;
+      mat.bumpTexture.wAng = wAng;
+      mat.ambientTexture.wAng = wAng;
+      mat.metallicTexture.wAng = wAng;
+      return mat;
+    })
   );
 
   const coinMat = new StandardMaterial("coinMat", scene);
@@ -1127,14 +1144,12 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // ---- Tipologie di ostacoli ----
-  // Ognuna definisce come costruire la mesh (i blocchi multi-corsia sono un
-  // nodo radice "vuoto" con più cubi figli — non Mesh.MergeMeshes, che
-  // ricentra i vertici sul primo elemento dell'array anziché conservarne le
-  // posizioni assolute, spostando/affondando la geometria in modo
-  // imprevedibile), quante corsie contigue occupa (laneSpan) e l'altezza
-  // oltre la quale il salto lo supera. L'ingombro usato in collisione
-  // (collisionHalfWidth) è calcolato da laneSpan, non specificato a mano:
-  // così collisione e geometria visibile non possono mai disallinearsi.
+  // Ognuna definisce come costruire la mesh (i blocchi multi-corsia sono più
+  // cubi fusi in un'unica mesh, vedi makeCubeGroup), quante corsie contigue
+  // occupa (laneSpan) e l'altezza oltre la quale il salto lo supera.
+  // L'ingombro usato in collisione (collisionHalfWidth) è calcolato da
+  // laneSpan, non specificato a mano: così collisione e geometria visibile
+  // non possono mai disallinearsi.
   const OBSTACLE_CUBE_SIZE = 1.4;
   const OBSTACLE_BASE_Y = OBSTACLE_CUBE_SIZE / 2; // centro del cubo poggiato a terra
   const LANE_GAP = LANES[1] - LANES[0]; // distanza tra corsie adiacenti (uniforme)
@@ -1149,17 +1164,31 @@ export async function createGameScene({ engine, canvas, goto }) {
     return o;
   }
 
-  // Nodo radice senza geometria propria: sposteremo solo lui (x/z) per far
-  // scorrere/riposizionare l'ostacolo, i cubi figli restano fissi nelle loro
-  // posizioni locali (root.position.y resta sempre 0).
+  // I cubi vengono fusi in un'unica mesh (invece di un nodo radice vuoto con
+  // più cubi figli): con mesh separate, il bordo bianco di enableOutline()
+  // (vedi più sotto) viene disegnato attorno a ciascun cubo singolarmente,
+  // mostrando una cucitura anche sulle facce interne dove due cubi si
+  // toccano. Fondendoli in un'unica mesh, l'outline segue il perimetro
+  // esterno dell'intero blocco, senza linee interne.
+  //
+  // Mesh.MergeMeshes userebbe di default la trasformazione del primo
+  // elemento dell'array come origine del risultato, ricentrando/spostando
+  // la geometria in modo imprevedibile per gli altri pezzi. Per evitarlo,
+  // ogni cubo viene prima traslato alla propria posizione locale e poi
+  // "cotto" nei vertici (bakeCurrentTransformIntoVertices, che trasla i
+  // vertici stessi e azzera position): così tutti i pezzi hanno già
+  // position (0,0,0) al momento della fusione, e il risultato resta
+  // ancorato esattamente all'origine del gruppo (nessun offset accidentale).
   function makeCubeGroup(name, boxes) {
-    const root = new Mesh(name, scene);
-    boxes.forEach(({ width, height, depth, x, y, z }, i) => {
+    const parts = boxes.map(({ width, height, depth, x, y, z }, i) => {
       const b = MeshBuilder.CreateBox(name + "_p" + i, { width, height, depth }, scene);
-      b.parent = root;
       b.position.set(x, y, z);
+      b.bakeCurrentTransformIntoVertices();
+      return b;
     });
-    return root;
+    const merged = Mesh.MergeMeshes(parts, true, true, undefined, false, false);
+    merged.name = name;
+    return merged;
   }
 
   // Colonna verticale: 3 cubi impilati, troppo alta per saltarci sopra —
@@ -1251,20 +1280,25 @@ export async function createGameScene({ engine, canvas, goto }) {
     ob.mesh.getChildMeshes().forEach(enableOutline);
   }
 
-  // Texture dei blocchi (vedi BLOCK_THEMES/blockMats più sopra): un solo
-  // tema alla volta, applicato a TUTTI gli ostacoli in pista (pool incluso,
-  // non solo quelli attivi) e cambiato ad ogni cambio di scenario (vedi
-  // update(), stesso evento dello switch di TILE_THEMES). Un ostacolo
-  // "cube" ha il materiale sulla mesh stessa; columnV/wall2/wall3 sono un
-  // nodo radice senza geometria propria (vedi makeCubeGroup) con i cubi
-  // veri come figli, quindi va assegnato a loro.
+  // Texture dei blocchi (vedi BLOCK_THEMES/blockMatsByTheme più sopra): un
+  // solo TEMA alla volta per tutti gli ostacoli in pista (pool incluso, non
+  // solo quelli attivi), cambiato ad ogni cambio di scenario (vedi update(),
+  // stesso evento dello switch di TILE_THEMES) — ma ogni ostacolo pesca
+  // indipendentemente una VARIANTE (rotazione UV) a caso dal pool di quel
+  // tema, così non sembrano tutti uguali pur condividendo lo stesso set di
+  // texture. Ogni ostacolo (cube o columnV/wall2/wall3, ormai tutti mesh
+  // singole fuse — vedi makeCubeGroup) ha il materiale sulla mesh stessa;
+  // getChildMeshes() è solo difensivo, per eventuali tipi futuri con
+  // gerarchia.
   function setObstacleMaterial(mesh, mat) {
     mesh.material = mat;
     mesh.getChildMeshes().forEach((child) => (child.material = mat));
   }
   function changeBlockTheme() {
-    const mat = blockMats[Math.floor(Math.random() * blockMats.length)];
-    for (const ob of obstacles) setObstacleMaterial(ob.mesh, mat);
+    const pool = blockMatsByTheme[Math.floor(Math.random() * blockMatsByTheme.length)];
+    for (const ob of obstacles) {
+      setObstacleMaterial(ob.mesh, pool[Math.floor(Math.random() * pool.length)]);
+    }
   }
   changeBlockTheme(); // tema iniziale, prima che qualunque ostacolo venga mai mostrato
 
