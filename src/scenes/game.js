@@ -123,6 +123,78 @@ const TILE_THEMES = [
 // ricomposta a runtime unendo le due immagini) per un costo GPU per-pixel
 // non giustificato su hosting statico/mobile-first (vedi CLAUDE.md).
 
+// Set di texture PBR per i blocchi/ostacoli (static/assets/imgs/tiles_blocks/),
+// stessa struttura a 4 mappe di TILE_THEMES ma applicate ai cubi degli
+// ostacoli invece che a pavimento/muri/soffitto. Una sola texture alla
+// volta è "attiva" per tutti gli ostacoli in pista, scelta a caso e
+// ricambiata ad ogni cambio di scenario (vedi changeBlockTheme() più sotto),
+// in sincrono con lo switch di TILE_THEMES.
+const BLOCK_THEMES = [
+  {
+    name: "cobblestone",
+    files: {
+      basecolor: "tiles_blocks/cobblestone/cobblestone_01_baseColor_1k.png",
+      normal: "tiles_blocks/cobblestone/cobblestone_01_normal_gl_1k.png",
+      ao: "tiles_blocks/cobblestone/cobblestone_01_ambientOcclusion_1k.png",
+      roughness: "tiles_blocks/cobblestone/cobblestone_01_roughness_1k.png",
+    },
+  },
+  {
+    name: "floor_tiles",
+    files: {
+      basecolor: "tiles_blocks/floor_tiles/floor_tiles_02_baseColor_1k.png",
+      normal: "tiles_blocks/floor_tiles/floor_tiles_02_normal_gl_1k.png",
+      ao: "tiles_blocks/floor_tiles/floor_tiles_02_ambientOcclusion_1k.png",
+      roughness: "tiles_blocks/floor_tiles/floor_tiles_02_roughness_1k.png",
+    },
+  },
+  {
+    name: "kwood_planks",
+    files: {
+      basecolor: "tiles_blocks/kwood_planks/basecolor_1kwood_planks_19_.png",
+      normal: "tiles_blocks/kwood_planks/normal_gl_1kwood_planks_19_.png",
+      ao: "tiles_blocks/kwood_planks/ambientocclusion_1kwood_planks_19_.png",
+      roughness: "tiles_blocks/kwood_planks/roughness_1kwood_planks_19_.png",
+    },
+  },
+  {
+    name: "plaster_wall",
+    files: {
+      basecolor: "tiles_blocks/plaster_wall/plaster_wall_01_basecolor_1k.png",
+      normal: "tiles_blocks/plaster_wall/plaster_wall_01_normal_gl_1k.png",
+      ao: "tiles_blocks/plaster_wall/plaster_wall_01_ambientocclusion_1k.png",
+      roughness: "tiles_blocks/plaster_wall/plaster_wall_01_roughness_1k.png",
+    },
+  },
+  {
+    name: "rock",
+    files: {
+      basecolor: "tiles_blocks/rock/rock_01_color_1k.png",
+      normal: "tiles_blocks/rock/rock_01_normal_gl_1k.png",
+      ao: "tiles_blocks/rock/rock_01_ambient_occlusion_1k.png",
+      roughness: "tiles_blocks/rock/rock_01_roughness_1k.png",
+    },
+  },
+  {
+    name: "rusted_metal_paint",
+    files: {
+      basecolor: "tiles_blocks/rusted_metal_paint/rusted_metal_paint_02_basecolor_1k.png",
+      normal: "tiles_blocks/rusted_metal_paint/rusted_metal_paint_02_normal_gl_1k.png",
+      ao: "tiles_blocks/rusted_metal_paint/rusted_metal_paint_02_ambientocclusion_1k.png",
+      roughness: "tiles_blocks/rusted_metal_paint/rusted_metal_paint_02_roughness_1k.png",
+    },
+  },
+  {
+    name: "wood",
+    files: {
+      basecolor: "tiles_blocks/wood/wood_02_color_1k.png",
+      normal: "tiles_blocks/wood/wood_02_normal_gl_1k.png",
+      ao: "tiles_blocks/wood/wood_02_ambient_occlusion_1k.png",
+      roughness: "tiles_blocks/wood/wood_02_roughness_1k.png",
+    },
+  },
+];
+
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
 const MAX_LIVES = CONFIG.game.lives; // vite iniziali: un ostacolo colpito ne toglie una
@@ -464,20 +536,16 @@ export async function createGameScene({ engine, canvas, goto }) {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // Ostacoli e monete: LAMP_INTENSITY resta a 10 (voluto), quindi con il
-  // colore diffuse "pieno" di prima (0.85-0.98) anche solo diffuse*intensità
-  // andava in clipping a bianco non appena un lampadario era vicino.
-  // disableLighting eliminava la reazione del tutto; qui invece si tiene
-  // acceso l'illuminamento ma con un diffuseColor tenuto basso, così il
-  // contributo delle luci resta un incremento moderato invece di saturare —
-  // l'emissiveColor dà il colore "di base" sempre visibile, il diffuse
-  // (ridotto) aggiunge la reazione più tenue alla luce vicina. Il muro non è
-  // toccato: resta illuminato normalmente come richiesto.
-  const obstacleMat = new StandardMaterial("obstacleMat", scene);
-  obstacleMat.emissiveColor = new Color3(0.5, 0.12, 0.15);
-  obstacleMat.diffuseColor = new Color3(0.2/3, 0.05/3, 0.06/3);
-  obstacleMat.specularColor = new Color3(0, 0, 0);
-  obstacleMat.maxSimultaneousLights = MAX_LIGHTS;
+  // Ostacoli: un materiale PBR per BLOCK_THEMES (stesso helper usato per
+  // pavimento/muri/soffitto), texture reale invece della tinta unita di
+  // prima. Repeat a 1 (nessuna ripetizione, texture stirata su tutta la
+  // faccia): i cubi degli ostacoli (OBSTACLE_CUBE_SIZE più sotto) sono
+  // piccoli rispetto alla scala a cui questi set sono pensati, un singolo
+  // tile per faccia risulta più leggibile di una ripetizione multipla.
+  const BLOCK_REPEAT = 1;
+  const blockMats = BLOCK_THEMES.map((theme) =>
+    makeTiledPbrMaterial(`obstacleMat_${theme.name}`, BLOCK_REPEAT, BLOCK_REPEAT, theme.files)
+  );
 
   const coinMat = new StandardMaterial("coinMat", scene);
   coinMat.emissiveColor = new Color3(0.55, 0.42, 0.06);
@@ -1071,9 +1139,12 @@ export async function createGameScene({ engine, canvas, goto }) {
   const OBSTACLE_BASE_Y = OBSTACLE_CUBE_SIZE / 2; // centro del cubo poggiato a terra
   const LANE_GAP = LANES[1] - LANES[0]; // distanza tra corsie adiacenti (uniforme)
 
+  // Il materiale viene assegnato subito dopo la costruzione del pool (vedi
+  // changeBlockTheme() più sotto), non qui: un solo tema alla volta è
+  // "attivo" per tutti gli ostacoli e cambia nel tempo, quindi non ha senso
+  // fissarlo alla creazione della mesh.
   function makeCubeObstacleMesh(name) {
     const o = MeshBuilder.CreateBox(name, { size: OBSTACLE_CUBE_SIZE }, scene);
-    o.material = obstacleMat;
     o.position.y = OBSTACLE_BASE_Y;
     return o;
   }
@@ -1085,7 +1156,6 @@ export async function createGameScene({ engine, canvas, goto }) {
     const root = new Mesh(name, scene);
     boxes.forEach(({ width, height, depth, x, y, z }, i) => {
       const b = MeshBuilder.CreateBox(name + "_p" + i, { width, height, depth }, scene);
-      b.material = obstacleMat;
       b.parent = root;
       b.position.set(x, y, z);
     });
@@ -1162,6 +1232,23 @@ export async function createGameScene({ engine, canvas, goto }) {
     });
   }
   const obstacles = Object.values(obstaclesByType).flat(); // scorrimento/riciclo unico in update()
+
+  // Texture dei blocchi (vedi BLOCK_THEMES/blockMats più sopra): un solo
+  // tema alla volta, applicato a TUTTI gli ostacoli in pista (pool incluso,
+  // non solo quelli attivi) e cambiato ad ogni cambio di scenario (vedi
+  // update(), stesso evento dello switch di TILE_THEMES). Un ostacolo
+  // "cube" ha il materiale sulla mesh stessa; columnV/wall2/wall3 sono un
+  // nodo radice senza geometria propria (vedi makeCubeGroup) con i cubi
+  // veri come figli, quindi va assegnato a loro.
+  function setObstacleMaterial(mesh, mat) {
+    mesh.material = mat;
+    mesh.getChildMeshes().forEach((child) => (child.material = mat));
+  }
+  function changeBlockTheme() {
+    const mat = blockMats[Math.floor(Math.random() * blockMats.length)];
+    for (const ob of obstacles) setObstacleMaterial(ob.mesh, mat);
+  }
+  changeBlockTheme(); // tema iniziale, prima che qualunque ostacolo venga mai mostrato
 
   function makeCoin(i) {
     const c = MeshBuilder.CreateCylinder("coin" + i, { diameter: 0.8, height: 0.12, tessellation: 16 }, scene);
@@ -1633,6 +1720,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     if (groundBucket !== state.groundBucket) {
       state.groundBucket = groundBucket;
       maybeTriggerSceneryChangeSfx();
+      changeBlockTheme();
     }
     const groundThemeIdx = themeForBucket(groundBucket);
 
