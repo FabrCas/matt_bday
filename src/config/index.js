@@ -33,8 +33,17 @@ const defaults = {
     duration: 4, // secondi di permanenza sulla schermata comandi prima di passare al gioco
   },
   powerups: {
-    spawnChance: 0.02, // probabilità (0..1) per riga che generi un power-up
-    starDuration: 30,  // secondi di invincibilità dati dalla stella
+    magnet: {
+      spawnChance: 0.02, // probabilità (0..1) per riga
+    },
+    hammer: {
+      spawnChance: 0.02,       // probabilità (0..1) per riga
+      noObstacleDuration: 5,   // secondi dopo l'uso in cui non vengono generati nuovi ostacoli
+    },
+    star: {
+      spawnChance: 0.02, // probabilità (0..1) per riga
+      duration: 30,      // secondi di invincibilità
+    },
   },
   gameplay: {
     lanes: [-2.2, 0, 2.2],

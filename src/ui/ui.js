@@ -84,7 +84,7 @@ export function updateControlsInfo() {
   els.controlsRedCoinValue.textContent = formatMoney(
     CONFIG.economy.coinValue * CONFIG.gameplay.redCoinValueMultiplier
   );
-  els.controlsStarDuration.textContent = CONFIG.powerups.starDuration;
+  els.controlsStarDuration.textContent = CONFIG.powerups.star.duration;
 }
 
 // Flash rosso a schermo intero al momento di un colpo (vedi hitObstacle() in

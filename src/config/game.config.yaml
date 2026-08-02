@@ -62,9 +62,18 @@ billboards:
     - "billboard_16.png"
 
 # --- Power-up temporanei (consumabili rari lungo il percorso) ---
+# Ogni tipo viene tentato indipendentemente ad ogni riga (come monete/moneta
+# rossa): con tutte le probabilità di default può quindi capitare più di un
+# power-up nella stessa riga (su corsie diverse).
 powerups:
-  spawnChance: 0.02   # probabilità (0..1) per riga che generi un power-up (una sola tipologia a riga, indipendente da monete/ostacoli)
-  starDuration: 30    # secondi di invincibilità dati dalla stella (⭐): ignora le collisioni con gli ostacoli
+  magnet:               # 🧲 raccoglie subito tutte le monete attive in pista
+    spawnChance: 0.02   # probabilità (0..1) per riga
+  hammer:                # 🔨 distrugge subito tutti gli ostacoli attivi in pista
+    spawnChance: 0.02    # probabilità (0..1) per riga
+    noObstacleDuration: 5  # secondi dopo l'uso in cui non vengono generati nuovi ostacoli
+  star:                  # ⭐ invincibilità: ignora le collisioni con gli ostacoli
+    spawnChance: 0.02    # probabilità (0..1) per riga
+    duration: 30         # secondi di invincibilità
 
 # --- Economia / vincita ---
 economy:

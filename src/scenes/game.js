@@ -86,11 +86,21 @@ const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni 
 const WALL_HEIGHT = 10;
 // ---- Power-up temporanei (vedi CONFIG.powerups) ----
 // magnete: raccoglie subito tutte le monete attive in pista.
-// martello: distrugge subito tutti gli ostacoli attivi in pista.
-// stella: invincibilità per POWERUP_STAR_DURATION secondi (ignora le collisioni).
-const POWERUP_SPAWN_CHANCE = CONFIG.powerups.spawnChance;
-const POWERUP_STAR_DURATION = CONFIG.powerups.starDuration;
-const POWERUP_KINDS = ["magnet", "hammer", "star"];
+// martello: distrugge subito tutti gli ostacoli attivi in pista, poi
+// sospende la generazione di nuovi ostacoli per HAMMER_NO_OBSTACLE_DURATION
+// secondi (altrimenti uno nuovo potrebbe comparire a distanza di sicurezza
+// pressoché nulla dal player appena "ripulito").
+// stella: invincibilità per STAR_DURATION secondi (ignora le collisioni).
+// Ogni tipo ha probabilità di spawn indipendente (vedi spawnRow()): con
+// tutte le probabilità di default può capitare più di un power-up sulla
+// stessa riga, su corsie diverse.
+const POWERUP_TYPES = [
+  { kind: "magnet", spawnChance: CONFIG.powerups.magnet.spawnChance },
+  { kind: "hammer", spawnChance: CONFIG.powerups.hammer.spawnChance },
+  { kind: "star", spawnChance: CONFIG.powerups.star.spawnChance },
+];
+const HAMMER_NO_OBSTACLE_DURATION = CONFIG.powerups.hammer.noObstacleDuration;
+const STAR_DURATION = CONFIG.powerups.star.duration;
 // ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
 // Placeholder: in seguito il box verrà sostituito da un modello importato.
 // Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
@@ -1051,7 +1061,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     coins: 0,
     lives: MAX_LIVES,
     invulnerableTimer: 0, // >0 dopo un colpo: ignora altre collisioni per HIT_INVULN_TIME secondi
-    starTimer: 0, // >0 dopo la stella: ignora le collisioni con gli ostacoli per POWERUP_STAR_DURATION secondi
+    starTimer: 0, // >0 dopo la stella: ignora le collisioni con gli ostacoli per STAR_DURATION secondi
+    hammerNoObstacleTimer: 0, // >0 dopo il martello: nessun nuovo ostacolo per HAMMER_NO_OBSTACLE_DURATION secondi
     laneIndex: 1,
     targetX: LANES[1],
     velY: 0,
@@ -1098,7 +1109,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     const coveredLanes = Array.from({ length: obsType.laneSpan }, (_, k) => startLane + k);
     const obsCenterX = (LANES[startLane] + LANES[startLane + obsType.laneSpan - 1]) / 2;
 
-    if (Math.random() < G.obstacleSpawnChance) {
+    // Il martello (vedi activatePowerup()) sospende la generazione di nuovi
+    // ostacoli per un po': altrimenti, subito dopo aver "ripulito" la pista,
+    // uno nuovo potrebbe comparire a distanza di sicurezza pressoché nulla.
+    if (state.hammerNoObstacleTimer <= 0 && Math.random() < G.obstacleSpawnChance) {
       const isWideBlock = obsType.laneSpan >= 2;
       if (isWideBlock) {
         if (state.consecutiveWideBlocks >= 2) {
@@ -1180,22 +1194,24 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
 
-    // Power-up raro (magnete/martello/stella): indipendente da monete/
-    // ostacoli, una sola tipologia a riga (vedi CONFIG.powerups.spawnChance).
-    // Stessa logica anti-sovrapposizione della moneta rossa: evita le
-    // corsie già occupate da moneta gialla/rossa quando possibile, e
+    // Power-up (magnete/martello/stella): ognuno ha una probabilità di
+    // spawn indipendente (vedi CONFIG.powerups.*.spawnChance), quindi più di
+    // uno può capitare sulla stessa riga. Stessa logica anti-sovrapposizione
+    // della moneta rossa: ogni nuovo elemento evita le corsie già occupate
+    // da monete/power-up precedenti in questa riga quando possibile, e
     // sposta la z se è comunque costretto a condividerne una.
-    if (Math.random() < POWERUP_SPAWN_CHANCE) {
-      const usedLanes = [coinLane, redLane].filter((l) => l !== null);
-      const puFreeLanes = freeLanes.filter((l) => !usedLanes.includes(l));
+    const usedLanesThisRow = [coinLane, redLane].filter((l) => l !== null);
+    for (const pt of POWERUP_TYPES) {
+      if (Math.random() >= pt.spawnChance) continue;
+      const puFreeLanes = freeLanes.filter((l) => !usedLanesThisRow.includes(l));
       const puLane = puFreeLanes.length
         ? puFreeLanes[Math.floor(Math.random() * puFreeLanes.length)]
         : pickFreeLane();
-      const puZ = usedLanes.includes(puLane)
+      const puZ = usedLanesThisRow.includes(puLane)
         ? state.nextSpawnZ + Math.max(coinRowCount, 1) * 1.6
         : state.nextSpawnZ;
-      const kind = POWERUP_KINDS[Math.floor(Math.random() * POWERUP_KINDS.length)];
-      const pu = spawnFrom(powerupsByKind[kind]);
+      usedLanesThisRow.push(puLane);
+      const pu = spawnFrom(powerupsByKind[pt.kind]);
       if (pu) {
         pu.active = true;
         pu.lane = puLane;
@@ -1332,19 +1348,23 @@ export async function createGameScene({ engine, canvas, goto }) {
       if (collected > 0) coinSfx?.play();
     } else if (kind === "hammer") {
       // Distrugge tutti gli ostacoli attualmente attivi in pista, senza
-      // alcuna perdita di vite (non passa da hitObstacle()).
+      // alcuna perdita di vite (non passa da hitObstacle()), poi sospende
+      // la generazione di nuovi ostacoli (vedi guard in spawnRow()). Non si
+      // somma a un timer già attivo: raccoglierne un secondo mentre il primo
+      // è ancora attivo rinnova la durata piena invece di allungarla.
       for (const ob of obstacles) {
         if (!ob.active) continue;
         ob.active = false;
         ob.mesh.setEnabled(false);
       }
+      state.hammerNoObstacleTimer = HAMMER_NO_OBSTACLE_DURATION;
     } else if (kind === "star") {
-      // Invincibilità per POWERUP_STAR_DURATION secondi: vedi il guard su
+      // Invincibilità per STAR_DURATION secondi: vedi il guard su
       // state.starTimer nel controllo di collisione ostacoli più sotto.
       // Non si somma a un timer già attivo (si rinnova alla durata piena),
       // così raccoglierne una seconda mentre la prima è ancora attiva non
       // dà un'invincibilità sproporzionatamente lunga.
-      state.starTimer = POWERUP_STAR_DURATION;
+      state.starTimer = STAR_DURATION;
     }
   }
 
@@ -1523,6 +1543,12 @@ export async function createGameScene({ engine, canvas, goto }) {
     // HUD più sotto.
     if (state.starTimer > 0) {
       state.starTimer = Math.max(0, state.starTimer - dt);
+    }
+    // Pausa post-martello (vedi activatePowerup()/spawnRow()): nessun
+    // feedback HUD dedicato, la si nota semplicemente dall'assenza di
+    // ostacoli per qualche secondo dopo l'uso.
+    if (state.hammerNoObstacleTimer > 0) {
+      state.hammerNoObstacleTimer = Math.max(0, state.hammerNoObstacleTimer - dt);
     }
 
     // Ostacoli e monete: scorrono verso il player.
