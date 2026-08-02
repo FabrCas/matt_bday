@@ -514,16 +514,37 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // Bagliore del player durante il power-up stella (vedi activatePowerup()/
-  // update()): l'emissiveColor originale di ogni materiale viene salvata una
-  // sola volta qui, così può essere ripristinata esattamente com'era quando
+  // update()): lo stato originale di ogni materiale viene salvato una sola
+  // volta qui, così può essere ripristinato esattamente com'era quando
   // l'effetto termina, invece di un valore fisso indovinato a mano.
+  // Il solo emissiveColor non basta sui materiali PBR esportati da glTF:
+  // se il materiale ha già un emissiveTexture (anche nero/non intenzionale),
+  // il colore emissivo finale è emissiveColor*emissiveTexture — con una
+  // texture nera il risultato resta nero qualunque emissiveColor si imposti.
+  // Per questo va temporaneamente rimossa (emissiveTexture: null) e
+  // ripristinata al termine, insieme a emissiveIntensity (che su alcuni
+  // export può essere 0, azzerando comunque l'emissivo).
   const STAR_GLOW_COLOR = new Color3(1, 0.92, 0.45);
   const playerBaseEmissive = playerMeshes
     .filter((m) => m.material && m.material.emissiveColor)
-    .map((m) => ({ mat: m.material, base: m.material.emissiveColor.clone() }));
+    .map((m) => ({
+      mat: m.material,
+      emissiveColor: m.material.emissiveColor.clone(),
+      emissiveTexture: m.material.emissiveTexture !== undefined ? m.material.emissiveTexture : undefined,
+      emissiveIntensity: m.material.emissiveIntensity,
+    }));
   function setPlayerGlow(active) {
-    for (const { mat, base } of playerBaseEmissive) {
-      mat.emissiveColor = active ? STAR_GLOW_COLOR : base;
+    for (const entry of playerBaseEmissive) {
+      const { mat } = entry;
+      if (active) {
+        mat.emissiveColor = STAR_GLOW_COLOR;
+        if (entry.emissiveTexture !== undefined) mat.emissiveTexture = null;
+        if (entry.emissiveIntensity !== undefined) mat.emissiveIntensity = Math.max(3, entry.emissiveIntensity);
+      } else {
+        mat.emissiveColor = entry.emissiveColor;
+        if (entry.emissiveTexture !== undefined) mat.emissiveTexture = entry.emissiveTexture;
+        if (entry.emissiveIntensity !== undefined) mat.emissiveIntensity = entry.emissiveIntensity;
+      }
     }
   }
 
