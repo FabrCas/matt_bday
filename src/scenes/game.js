@@ -325,13 +325,13 @@ export async function createGameScene({ engine, canvas, goto }) {
   // toccato: resta illuminato normalmente come richiesto.
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
   obstacleMat.emissiveColor = new Color3(0.5, 0.12, 0.15);
-  obstacleMat.diffuseColor = new Color3(0.2, 0.05, 0.06);
+  obstacleMat.diffuseColor = new Color3(0.2/3, 0.05/3, 0.06/3);
   obstacleMat.specularColor = new Color3(0, 0, 0);
   obstacleMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const coinMat = new StandardMaterial("coinMat", scene);
   coinMat.emissiveColor = new Color3(0.55, 0.42, 0.06);
-  coinMat.diffuseColor = new Color3(0.2, 0.15, 0.03);
+  coinMat.diffuseColor = new Color3(0.2/5, 0.15/5, 0.03/5);
   coinMat.specularColor = new Color3(0, 0, 0);
   coinMat.maxSimultaneousLights = MAX_LIGHTS;
 
