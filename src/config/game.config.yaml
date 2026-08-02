@@ -15,7 +15,7 @@ game:
   subtitle: "Guadagnati il regalo raccogliendo le monete!"
   # Se false, nella schermata di game over non compare il bottone "rigioca"
   # (es. per disattivare i replay dopo l'evento).
-  allowReplay: false
+  allowReplay: true
   # Numero di vite: ogni ostacolo colpito ne toglie una; a 0 si va a game over.
   lives: 3
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
