@@ -23,6 +23,7 @@ import { loadSound, disposeSound } from "../utils/audioLoader.js";
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "matt.glb";
 const CHANDELIER_MODEL = "lamp.glb";
+const MAGNET_MODEL = "magnet.glb";
 
 // Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
 // a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
@@ -472,6 +473,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   // (vedi il ciclo `lamps` più sotto), al posto del box giallo placeholder:
   // evita di scaricare/parsare il file una volta per ogni lampadario.
   const chandelierContainer = await loadModelContainer(scene, CHANDELIER_MODEL);
+
+
+  // modello magnete
+  const magnetContainer = await loadModelContainer(scene, CHANDELIER_MODEL);
+
 
   // Fix per materiali importati da glb (player, lampadari, ecc.):
   // 1) stesso cap di luci degli altri materiali della scena (vedi MAX_LIGHTS
@@ -1749,6 +1755,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     disposeSound(soundtrack);
     disposeSound(soundghostmax);
     disposeSound(soundpowerupstart);
+    disposeSound(hurtsfx); 
     jumpSfx.forEach(disposeSound);
     disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });
     scene.dispose();
