@@ -405,15 +405,32 @@ export async function createGameScene({ engine, canvas, goto }) {
     return Array.isArray(entry) ? pickRandom(entry) : entry;
   }
 
+  // Sacchetto di indici tema (stile Tetris, come drawBillboardImage() più
+  // sotto): si svuota pescando senza reinserire, si rimescola (Fisher-Yates)
+  // solo quando è vuoto — garantisce "nessuna ripetizione finché gli altri
+  // temi non sono già usciti tutti", non una semplice scelta uniforme che
+  // potrebbe ripresentare lo stesso tema più volte di fila.
+  let tileThemeBag = [];
+  function drawTileTheme() {
+    if (tileThemeBag.length === 0) {
+      tileThemeBag = Array.from({ length: TILE_THEMES.length }, (_, i) => i);
+      for (let i = tileThemeBag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tileThemeBag[i], tileThemeBag[j]] = [tileThemeBag[j], tileThemeBag[i]];
+      }
+    }
+    return tileThemeBag.pop();
+  }
+
   // Tema per ogni "bucket" di GROUND_THEME_SWITCH_DISTANCE metri: il primo
   // (0-1000m) è sempre TILE_THEMES[0] (ground_tiles_03), i successivi sono
-  // scelti a caso tra tutti i temi — memorizzati alla prima richiesta così
-  // la scelta resta la stessa per tutta la durata del bucket invece di
-  // ricambiare ad ogni frame (vedi update()).
+  // pescati dal sacchetto — memorizzati alla prima richiesta così la scelta
+  // resta la stessa per tutta la durata del bucket invece di ricambiare ad
+  // ogni frame (vedi update()).
   const themeIndexByBucket = new Map([[0, 0]]);
   function themeForBucket(bucket) {
     if (!themeIndexByBucket.has(bucket)) {
-      themeIndexByBucket.set(bucket, Math.floor(Math.random() * TILE_THEMES.length));
+      themeIndexByBucket.set(bucket, drawTileTheme());
     }
     return themeIndexByBucket.get(bucket);
   }
