@@ -126,6 +126,7 @@ const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
 const LAMP_INTENSITY = 10;
+const MAGNET_MODEL_SCALE = 0.5; // tarare in base alle dimensioni reali del modello magnet.glb
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
@@ -368,15 +369,10 @@ export async function createGameScene({ engine, canvas, goto }) {
   coinRedMat.specularColor = new Color3(0, 0, 0);
   coinRedMat.maxSimultaneousLights = MAX_LIGHTS;
 
-  // Power-up (magnete/martello/stella): stesso schema di monete/ostacoli
-  // (emissivo dominante, diffuse tenuto basso) per non reagire troppo alle
-  // luci pur restando illuminati.
-  const magnetMat = new StandardMaterial("magnetMat", scene);
-  magnetMat.emissiveColor = new Color3(0.15, 0.35, 0.6);
-  magnetMat.diffuseColor = new Color3(0.06, 0.13, 0.22);
-  magnetMat.specularColor = new Color3(0, 0, 0);
-  magnetMat.maxSimultaneousLights = MAX_LIGHTS;
-
+  // Power-up (martello/stella): stesso schema di monete/ostacoli (emissivo
+  // dominante, diffuse tenuto basso) per non reagire troppo alle luci pur
+  // restando illuminati. Il magnete usa invece il modello importato
+  // (magnet.glb, vedi makeMagnet()) coi suoi materiali originali.
   const hammerMat = new StandardMaterial("hammerMat", scene);
   hammerMat.emissiveColor = new Color3(1, 0.5, 0);
   hammerMat.diffuseColor = new Color3(0.15, 0.1, 0.04);
@@ -475,8 +471,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   const chandelierContainer = await loadModelContainer(scene, CHANDELIER_MODEL);
 
 
-  // modello magnete
-  const magnetContainer = await loadModelContainer(scene, CHANDELIER_MODEL);
+  // ---- Modello magnete (glb) ----
+  // Stesso schema del lampadario: caricato una sola volta come AssetContainer
+  // e istanziato per ogni slot del pool (vedi makeMagnet() più sotto), al
+  // posto del toroide procedurale usato finché non era disponibile l'asset.
+  const magnetContainer = await loadModelContainer(scene, MAGNET_MODEL);
 
 
   // Fix per materiali importati da glb (player, lampadari, ecc.):
@@ -1048,24 +1047,31 @@ export async function createGameScene({ engine, canvas, goto }) {
   const coins = Array.from({ length: 24 }, (_, i) => makeCoin(i));
 
   // ---- Power-up (magnete/martello/stella) ----
-  // Forme procedurali distintive (nessun asset dedicato disponibile): un
-  // toroide per il magnete, un martello a due pezzi (manico+testa), un
-  // dipiramide pentagonale sfaccettata per la stella. Pool piccoli (2 per
-  // tipo): non ne serve mai più di uno in pista, i doppioni servono solo a
-  // non dover aspettare il despawn del precedente per generarne un altro.
+  // Il magnete usa il modello importato (magnet.glb, vedi magnetContainer
+  // più sopra), istanziato una volta per slot del pool come i lampadari.
+  // Martello e stella restano forme procedurali (nessun asset dedicato per
+  // loro): un martello a due pezzi (manico+testa), una dipiramide
+  // pentagonale sfaccettata per la stella. Pool piccoli (2 per tipo): non
+  // ne serve mai più di uno in pista, i doppioni servono solo a non dover
+  // aspettare il despawn del precedente per generarne un altro.
   function makePowerupCommon(mesh, kind) {
     mesh.setEnabled(false);
     if (DEBUG) mesh.showBoundingBox = true;
     return { mesh, active: false, lane: 0, kind };
   }
   function makeMagnet(i) {
-    const m = MeshBuilder.CreateTorus(
-      "magnet" + i,
-      { diameter: 0.9, thickness: 0.28, tessellation: 20 },
-      scene
+    // instantiateModelsToScene clona la gerarchia di nodi ma riusa i
+    // materiali (cloneMaterials: false), come per i lampadari: tutte le
+    // istanze condividono le stesse texture/draw call di materiale.
+    const { rootNodes } = magnetContainer.instantiateModelsToScene(
+      (name) => `${name}_magnet${i}`,
+      false
     );
-    m.material = magnetMat;
-    return makePowerupCommon(m, "magnet");
+    const model = rootNodes[0];
+    model.scaling.set(MAGNET_MODEL_SCALE, MAGNET_MODEL_SCALE, MAGNET_MODEL_SCALE);
+    if (DEBUG) model.getChildMeshes().forEach((m) => (m.showBoundingBox = true));
+    fixImportedMaterials(model.getChildMeshes());
+    return makePowerupCommon(model, "magnet");
   }
   function makeHammer(i) {
     const root = new Mesh("hammer" + i, scene);
