@@ -84,6 +84,13 @@ const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
 const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete allo spawn
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
 const WALL_HEIGHT = 10;
+// ---- Power-up temporanei (vedi CONFIG.powerups) ----
+// magnete: raccoglie subito tutte le monete attive in pista.
+// martello: distrugge subito tutti gli ostacoli attivi in pista.
+// stella: invincibilità per POWERUP_STAR_DURATION secondi (ignora le collisioni).
+const POWERUP_SPAWN_CHANCE = CONFIG.powerups.spawnChance;
+const POWERUP_STAR_DURATION = CONFIG.powerups.starDuration;
+const POWERUP_KINDS = ["magnet", "hammer", "star"];
 // ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
 // Placeholder: in seguito il box verrà sostituito da un modello importato.
 // Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
@@ -343,6 +350,27 @@ export async function createGameScene({ engine, canvas, goto }) {
   coinRedMat.specularColor = new Color3(0, 0, 0);
   coinRedMat.maxSimultaneousLights = MAX_LIGHTS;
 
+  // Power-up (magnete/martello/stella): stesso schema di monete/ostacoli
+  // (emissivo dominante, diffuse tenuto basso) per non reagire troppo alle
+  // luci pur restando illuminati.
+  const magnetMat = new StandardMaterial("magnetMat", scene);
+  magnetMat.emissiveColor = new Color3(0.15, 0.35, 0.6);
+  magnetMat.diffuseColor = new Color3(0.06, 0.13, 0.22);
+  magnetMat.specularColor = new Color3(0, 0, 0);
+  magnetMat.maxSimultaneousLights = MAX_LIGHTS;
+
+  const hammerMat = new StandardMaterial("hammerMat", scene);
+  hammerMat.emissiveColor = new Color3(0.42, 0.28, 0.12);
+  hammerMat.diffuseColor = new Color3(0.15, 0.1, 0.04);
+  hammerMat.specularColor = new Color3(0, 0, 0);
+  hammerMat.maxSimultaneousLights = MAX_LIGHTS;
+
+  const starMat = new StandardMaterial("starMat", scene);
+  starMat.emissiveColor = new Color3(0.65, 0.55, 0.08);
+  starMat.diffuseColor = new Color3(0.2, 0.17, 0.02);
+  starMat.specularColor = new Color3(0, 0, 0);
+  starMat.maxSimultaneousLights = MAX_LIGHTS;
+
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
   // caricamento non deve bloccare l'avvio della scena (vedi audioLoader.js
@@ -355,6 +383,14 @@ export async function createGameScene({ engine, canvas, goto }) {
   let coinredSfx = null;
   loadSound("coin_red.mp3", { volume: 0.8 }).then((s) => {
     coinredSfx = s;
+  });
+
+  // Nessun asset audio dedicato ai power-up: riusa lo stesso sfx della
+  // moneta rossa (già percepito come "bonus raro") per il pickup di
+  // magnete/martello/stella.
+  let powerupSfx = null;
+  loadSound("coin_red.mp3", { volume: 0.9 }).then((s) => {
+    powerupSfx = s;
   });
 
   let hurtsfx = null;
@@ -947,6 +983,62 @@ export async function createGameScene({ engine, canvas, goto }) {
 
   const coins = Array.from({ length: 24 }, (_, i) => makeCoin(i));
 
+  // ---- Power-up (magnete/martello/stella) ----
+  // Forme procedurali distintive (nessun asset dedicato disponibile): un
+  // toroide per il magnete, un martello a due pezzi (manico+testa), un
+  // dipiramide pentagonale sfaccettata per la stella. Pool piccoli (2 per
+  // tipo): non ne serve mai più di uno in pista, i doppioni servono solo a
+  // non dover aspettare il despawn del precedente per generarne un altro.
+  function makePowerupCommon(mesh, kind) {
+    mesh.setEnabled(false);
+    if (DEBUG) mesh.showBoundingBox = true;
+    return { mesh, active: false, lane: 0, kind };
+  }
+  function makeMagnet(i) {
+    const m = MeshBuilder.CreateTorus(
+      "magnet" + i,
+      { diameter: 0.9, thickness: 0.28, tessellation: 20 },
+      scene
+    );
+    m.material = magnetMat;
+    return makePowerupCommon(m, "magnet");
+  }
+  function makeHammer(i) {
+    const root = new Mesh("hammer" + i, scene);
+    const handle = MeshBuilder.CreateCylinder(
+      "hammer" + i + "_handle",
+      { diameter: 0.14, height: 0.9, tessellation: 8 },
+      scene
+    );
+    handle.material = hammerMat;
+    handle.parent = root;
+    handle.position.set(0, -0.15, 0);
+    const head = MeshBuilder.CreateBox(
+      "hammer" + i + "_head",
+      { width: 0.6, height: 0.32, depth: 0.32 },
+      scene
+    );
+    head.material = hammerMat;
+    head.parent = root;
+    head.position.set(0, 0.4, 0);
+    return makePowerupCommon(root, "hammer");
+  }
+  function makeStar(i) {
+    // type 11 = dipiramide pentagonale (J13): a punta su entrambi i lati,
+    // la forma sfaccettata più vicina a una "gemma a stella" tra i
+    // poliedri disponibili in Babylon senza costruire geometria custom.
+    const m = MeshBuilder.CreatePolyhedron("star" + i, { type: 11, size: 0.5 }, scene);
+    m.material = starMat;
+    return makePowerupCommon(m, "star");
+  }
+
+  const powerupsByKind = {
+    magnet: Array.from({ length: 2 }, (_, i) => makeMagnet(i)),
+    hammer: Array.from({ length: 2 }, (_, i) => makeHammer(i)),
+    star: Array.from({ length: 2 }, (_, i) => makeStar(i)),
+  };
+  const powerups = Object.values(powerupsByKind).flat(); // scorrimento/riciclo unico in update()
+
   function spawnFrom(pool) {
     return pool.find((e) => !e.active) || null;
   }
@@ -959,6 +1051,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     coins: 0,
     lives: MAX_LIVES,
     invulnerableTimer: 0, // >0 dopo un colpo: ignora altre collisioni per HIT_INVULN_TIME secondi
+    starTimer: 0, // >0 dopo la stella: ignora le collisioni con gli ostacoli per POWERUP_STAR_DURATION secondi
     laneIndex: 1,
     targetX: LANES[1],
     velY: 0,
@@ -974,7 +1067,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // molti frame consecutivi. Scrivere nel DOM (textContent, ricostruzione
   // della stringa cuori) solo quando cambia davvero evita un costo per-frame
   // sprecato che contribuiva ai cali di frame.
-  const lastHud = { coins: null, distance: null, lives: null };
+  const lastHud = { coins: null, distance: null, lives: null, starTime: null };
 
   function spawnRow() {
     // Pause brevi e periodiche senza alcuno spawn: danno respiro al ritmo di
@@ -1068,9 +1161,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     // sposta la z se finisce comunque sulla stessa corsia: altrimenti la
     // moneta rossa nasce esattamente sopra la prima moneta gialla (k=0
     // condivide la stessa z di partenza state.nextSpawnZ).
+    let redLane = null;
     if (Math.random() < G.redCoinChance) {
       const redFreeLanes = coinLane === null ? freeLanes : freeLanes.filter((l) => l !== coinLane);
-      const redLane = redFreeLanes.length
+      redLane = redFreeLanes.length
         ? redFreeLanes[Math.floor(Math.random() * redFreeLanes.length)]
         : pickFreeLane();
       const redZ = redLane === coinLane ? state.nextSpawnZ + coinRowCount * 1.6 : state.nextSpawnZ;
@@ -1083,6 +1177,31 @@ export async function createGameScene({ engine, canvas, goto }) {
         red.mesh.setEnabled(true);
         red.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
         red.mesh.position.set(LANES[redLane], 1.0, redZ);
+      }
+    }
+
+    // Power-up raro (magnete/martello/stella): indipendente da monete/
+    // ostacoli, una sola tipologia a riga (vedi CONFIG.powerups.spawnChance).
+    // Stessa logica anti-sovrapposizione della moneta rossa: evita le
+    // corsie già occupate da moneta gialla/rossa quando possibile, e
+    // sposta la z se è comunque costretto a condividerne una.
+    if (Math.random() < POWERUP_SPAWN_CHANCE) {
+      const usedLanes = [coinLane, redLane].filter((l) => l !== null);
+      const puFreeLanes = freeLanes.filter((l) => !usedLanes.includes(l));
+      const puLane = puFreeLanes.length
+        ? puFreeLanes[Math.floor(Math.random() * puFreeLanes.length)]
+        : pickFreeLane();
+      const puZ = usedLanes.includes(puLane)
+        ? state.nextSpawnZ + Math.max(coinRowCount, 1) * 1.6
+        : state.nextSpawnZ;
+      const kind = POWERUP_KINDS[Math.floor(Math.random() * POWERUP_KINDS.length)];
+      const pu = spawnFrom(powerupsByKind[kind]);
+      if (pu) {
+        pu.active = true;
+        pu.lane = puLane;
+        pu.mesh.setEnabled(true);
+        pu.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
+        pu.mesh.position.set(LANES[puLane], 1.0, puZ);
       }
     }
 
@@ -1193,6 +1312,42 @@ export async function createGameScene({ engine, canvas, goto }) {
     }
   }
 
+  // Effetto immediato al raccoglimento di un power-up (vedi loop dei
+  // power-up in update()): magnete e martello agiscono una tantum su tutto
+  // ciò che è attivo in pista in quel momento, la stella avvia/rinnova un
+  // timer di invincibilità.
+  function activatePowerup(kind) {
+    powerupSfx?.play();
+    if (kind === "magnet") {
+      // Raccoglie tutte le monete (gialle e rosse) attualmente attive in
+      // pista, come se il player le avesse toccate una per una.
+      let collected = 0;
+      for (const co of coins) {
+        if (!co.active) continue;
+        co.active = false;
+        co.mesh.setEnabled(false);
+        state.coins += co.value;
+        collected += 1;
+      }
+      if (collected > 0) coinSfx?.play();
+    } else if (kind === "hammer") {
+      // Distrugge tutti gli ostacoli attualmente attivi in pista, senza
+      // alcuna perdita di vite (non passa da hitObstacle()).
+      for (const ob of obstacles) {
+        if (!ob.active) continue;
+        ob.active = false;
+        ob.mesh.setEnabled(false);
+      }
+    } else if (kind === "star") {
+      // Invincibilità per POWERUP_STAR_DURATION secondi: vedi il guard su
+      // state.starTimer nel controllo di collisione ostacoli più sotto.
+      // Non si somma a un timer già attivo (si rinnova alla durata piena),
+      // così raccoglierne una seconda mentre la prima è ancora attiva non
+      // dà un'invincibilità sproporzionatamente lunga.
+      state.starTimer = POWERUP_STAR_DURATION;
+    }
+  }
+
   // ===== Fine partita =====
   function gameOver() {
     if (!state.running) return;
@@ -1215,7 +1370,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   await scene.whenReadyAsync(true);
 
   ui.show("hud");
-  ui.updateHud({ coins: 0, distance: 0, lives: state.lives, maxLives: MAX_LIVES });
+  ui.updateHud({ coins: 0, distance: 0, lives: state.lives, maxLives: MAX_LIVES, starTime: 0 });
 
   // ===== Loop =====
   function update(dt) {
@@ -1362,6 +1517,14 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
 
+    // Invincibilità da power-up stella (vedi activatePowerup()): a
+    // differenza dell'invulnerabilità da colpo, nessun lampeggio (non è un
+    // segnale di "appena colpito"), solo il conto alla rovescia mostrato in
+    // HUD più sotto.
+    if (state.starTimer > 0) {
+      state.starTimer = Math.max(0, state.starTimer - dt);
+    }
+
     // Ostacoli e monete: scorrono verso il player.
     const px = player.position.x;
     const py = player.position.y;
@@ -1378,6 +1541,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       const t = ob.obstacleType;
       if (
         state.invulnerableTimer <= 0 &&
+        state.starTimer <= 0 &&
         Math.abs(ob.mesh.position.z) < 0.9 &&
         Math.abs(ob.mesh.position.x - px) < t.collisionHalfWidth &&
         py < t.jumpClearY
@@ -1414,21 +1578,46 @@ export async function createGameScene({ engine, canvas, goto }) {
       }
     }
 
+    for (const pu of powerups) {
+      if (!pu.active) continue;
+      pu.mesh.position.z -= move;
+      pu.mesh.rotation.y += dt * 2.5; // rotazione lenta, li rende riconoscibili senza confonderli con le monete
+      // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
+      pu.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - pu.mesh.position.z) / FADE_DISTANCE));
+      if (Math.abs(pu.mesh.position.z) < 0.9 && Math.abs(pu.mesh.position.x - px) < 0.9 && Math.abs(py - 1.0) < 1.1) {
+        pu.active = false;
+        pu.mesh.setEnabled(false);
+        activatePowerup(pu.kind);
+      }
+      if (pu.mesh.position.z < DESPAWN_BEHIND) {
+        pu.active = false;
+        pu.mesh.setEnabled(false);
+      }
+    }
+
     // Genera nuove righe man mano che il "fronte" si avvicina.
     state.nextSpawnZ -= move;
     while (state.nextSpawnZ < SPAWN_AHEAD) spawnRow();
 
     const hudCoins = state.coins * CONFIG.economy.coinValue;
     const hudDistance = Math.floor(state.distance);
-    if (hudCoins !== lastHud.coins || hudDistance !== lastHud.distance || state.lives !== lastHud.lives) {
+    const hudStarTime = Math.ceil(state.starTimer); // conto alla rovescia intero, es. 30,29,...,1,0
+    if (
+      hudCoins !== lastHud.coins ||
+      hudDistance !== lastHud.distance ||
+      state.lives !== lastHud.lives ||
+      hudStarTime !== lastHud.starTime
+    ) {
       lastHud.coins = hudCoins;
       lastHud.distance = hudDistance;
       lastHud.lives = state.lives;
+      lastHud.starTime = hudStarTime;
       ui.updateHud({
         coins: hudCoins,
         distance: hudDistance,
         lives: state.lives,
         maxLives: MAX_LIVES,
+        starTime: hudStarTime,
       });
     }
   }
@@ -1439,6 +1628,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     canvas.removeEventListener("pointerup", onPointerUp);
     disposeSound(coinSfx);
     disposeSound(coinredSfx);
+    disposeSound(powerupSfx);
     disposeSound(soundtrack);
     jumpSfx.forEach(disposeSound);
     disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });

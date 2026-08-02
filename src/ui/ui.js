@@ -15,6 +15,8 @@ const els = {
   hudCoins: document.getElementById("hud-coins"),
   hudDistance: document.getElementById("hud-distance"),
   hudLives: document.getElementById("hud-lives"),
+  hudStar: document.getElementById("hud-star"),
+  hudStarTime: document.getElementById("hud-star-time"),
   wonAmount: document.getElementById("won-amount"),
   endMessage: document.getElementById("endgame-message"),
   goCoins: document.getElementById("go-coins"),
@@ -28,6 +30,7 @@ const els = {
   controlsLives: document.getElementById("controls-lives"),
   controlsCoinValue: document.getElementById("controls-coin-value"),
   controlsRedCoinValue: document.getElementById("controls-red-coin-value"),
+  controlsStarDuration: document.getElementById("controls-star-duration"),
 };
 
 // Applica titolo/sottotitolo dalla config statica (una volta all'avvio).
@@ -44,12 +47,17 @@ export function show(...names) {
   }
 }
 
-export function updateHud({ coins, distance, lives, maxLives }) {
+export function updateHud({ coins, distance, lives, maxLives, starTime }) {
   els.hudCoins.textContent = coins + " €";
   els.hudDistance.textContent = Math.floor(distance);
   if (lives !== undefined && maxLives !== undefined) {
     els.hudLives.textContent = "❤️".repeat(lives) + "🖤".repeat(maxLives - lives);
   }
+  // Indicatore invincibilità (power-up stella, vedi game.js): visibile solo
+  // mentre il conto alla rovescia è > 0.
+  const starActive = !!starTime && starTime > 0;
+  els.hudStar.classList.toggle("hidden", !starActive);
+  if (starActive) els.hudStarTime.textContent = starTime;
 }
 
 export function updateGameOver({ coins, distance, amount, message}) {
@@ -76,6 +84,7 @@ export function updateControlsInfo() {
   els.controlsRedCoinValue.textContent = formatMoney(
     CONFIG.economy.coinValue * CONFIG.gameplay.redCoinValueMultiplier
   );
+  els.controlsStarDuration.textContent = CONFIG.powerups.starDuration;
 }
 
 // Flash rosso a schermo intero al momento di un colpo (vedi hitObstacle() in

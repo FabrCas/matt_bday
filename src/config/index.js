@@ -32,6 +32,10 @@ const defaults = {
   controls: {
     duration: 4, // secondi di permanenza sulla schermata comandi prima di passare al gioco
   },
+  powerups: {
+    spawnChance: 0.02, // probabilità (0..1) per riga che generi un power-up
+    starDuration: 30,  // secondi di invincibilità dati dalla stella
+  },
   gameplay: {
     lanes: [-2.2, 0, 2.2],
     startSpeed: 14,

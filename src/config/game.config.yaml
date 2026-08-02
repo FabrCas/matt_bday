@@ -61,6 +61,11 @@ billboards:
     - "billboard_15.jpg"
     - "billboard_16.png"
 
+# --- Power-up temporanei (consumabili rari lungo il percorso) ---
+powerups:
+  spawnChance: 0.02   # probabilità (0..1) per riga che generi un power-up (una sola tipologia a riga, indipendente da monete/ostacoli)
+  starDuration: 30    # secondi di invincibilità dati dalla stella (⭐): ignora le collisioni con gli ostacoli
+
 # --- Economia / vincita ---
 economy:
   currencySymbol: "€"
