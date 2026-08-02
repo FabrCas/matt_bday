@@ -68,13 +68,13 @@ billboards:
 powerups:
   magnet:               # 🧲 attrae verso il giocatore tutte le monete attive in pista (poi raccolte al contatto)
     spawnChance: 0.25   # probabilità (0..1) per riga
-    duration: 6         # secondi in cui le monete vengono attratte verso il giocatore
+    duration: 10        # secondi in cui le monete vengono attratte verso il giocatore
     attractSpeed: 18    # velocità (unità/s) con cui le monete si muovono verso il giocatore mentre sono attratte
   hammer:                # 🔨 distrugge subito tutti gli ostacoli attivi in pista
-    spawnChance: 0.25    # probabilità (0..1) per riga
-    noObstacleDuration: 5  # secondi dopo l'uso in cui non vengono generati nuovi ostacoli
+    spawnChance: 0.02    # probabilità (0..1) per riga
+    noObstacleDuration: 8 # secondi dopo l'uso in cui non vengono generati nuovi ostacoli
   star:                  # ⭐ invincibilità: ignora le collisioni con gli ostacoli
-    spawnChance: 0.25    # probabilità (0..1) per riga
+    spawnChance: 0.02    # probabilità (0..1) per riga
     duration: 10         # secondi di invincibilità
 
 # --- Economia / vincita ---

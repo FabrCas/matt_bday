@@ -131,7 +131,7 @@ const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
 const LAMP_INTENSITY = 10;
-const MAGNET_MODEL_SCALE = 0.5; // tarare in base alle dimensioni reali del modello magnet.glb
+const MAGNET_MODEL_SCALE = 0.4; // tarare in base alle dimensioni reali del modello magnet.glb
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
@@ -1774,6 +1774,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     disposeSound(hurtsfx); 
     jumpSfx.forEach(disposeSound);
     disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });
+    chandelierContainer.dispose();
+    magnetContainer.dispose();
     scene.dispose();
   }
 

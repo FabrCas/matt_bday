@@ -26,18 +26,18 @@ const FACE_4 = "face_4.png";
 const FACE_5 = "face_5.png";
 const FACE_6 = "face_0.png";
 const FACE_7 = "face_6.png";
-const FACE_8 = "face_kermit.png";
-const FACE_9 = "face_kermit.png";
+const FACE_8 = "face_7.png";
+const FACE_9 = "face_8.png";
 const FACES = [
   FACE_KERMIT,
   FACE_1,
   FACE_2,
   FACE_3,
-  FACE_4,
-  FACE_5,
   FACE_6,
-  FACE_7,
+  FACE_5,
+  FACE_4,
   FACE_8,
+  FACE_7,
   FACE_9
 ]
 // const FACE_1 = "face_kermit.png";
