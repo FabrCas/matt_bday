@@ -131,6 +131,9 @@ const MAX_LIGHTS = LAMP_COUNT + 1; // + direzionale + playerLight
 const FOG_WALL_Y = WALL_HEIGHT * 0.55;
 const FOG_WALL_WIDTH = 10;
 const FOG_WALL_HEIGHT = 10;
+// Altezza massima che il velo può avere restando centrato su FOG_WALL_Y
+// senza sporgere oltre il soffitto o sotto il pavimento della stanza.
+const FOG_MAX_HEIGHT = 2 * Math.min(FOG_WALL_Y, WALL_HEIGHT - FOG_WALL_Y);
 const FOG_CROSS_DURATION_MIN = 9; // secondi per attraversare tutto lo schermo
 const FOG_CROSS_DURATION_MAX = 15;
 const FOG_EDGE_FADE = 0.15; // frazione iniziale/finale del tragitto dedicata alla dissolvenza
@@ -554,13 +557,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // Le immagini di nebbia hanno proporzioni diverse tra loro (alcune molto
-  // larghe, altre molto strette) e non quadrate come il piano fisso
-  // FOG_WALL_WIDTH×FOG_WALL_HEIGHT su cui vengono applicate: senza
-  // correzione risultano stirate/deformate. Le dimensioni reali si leggono
-  // una sola volta qui (non deducibili dal nome file), prima di costruire i
-  // materiali, per calcolare un fit "a copertura" (come CSS
-  // background-size: cover): scala uniforme, l'immagine riempie tutto il
-  // piano senza deformarsi, l'eccedenza viene ritagliata invece di stirata.
+  // larghe, altre molto strette) e non quadrate come il piano di riferimento
+  // FOG_WALL_WIDTH×FOG_WALL_HEIGHT: senza correzione risultano stirate/
+  // deformate. Le dimensioni reali si leggono una sola volta qui (non
+  // deducibili dal nome file), prima di costruire i materiali, per calcolare
+  // un fit "a contenimento" (come CSS background-size: contain): il piano
+  // viene ridimensionato per immagine mantenendo l'aspect ratio, così
+  // l'immagine è sempre visibile per intero, mai ritagliata. L'altezza è
+  // inoltre limitata a FOG_MAX_HEIGHT per non sporgere oltre soffitto/
+  // pavimento della stanza (altrimenti il velo veniva tagliato da essi).
   const fogImageSizes = new Map();
   await Promise.all(
     FOG_TEXTURES.map(async (file) => {
@@ -568,39 +573,32 @@ export async function createGameScene({ engine, canvas, goto }) {
         const el = await loadHtmlImage(file);
         fogImageSizes.set(file, { width: el.naturalWidth, height: el.naturalHeight });
       } catch {
-        fogImageSizes.set(file, { width: 1, height: 1 }); // fallback: nessun crop
+        fogImageSizes.set(file, { width: 1, height: 1 }); // fallback: quadrato, nessuna distorsione
       }
     })
   );
 
-  const fogPlaneAspect = FOG_WALL_WIDTH / FOG_WALL_HEIGHT;
-  function coverUvFit(imgAspect, planeAspect) {
-    if (imgAspect > planeAspect) {
-      // Immagine relativamente più larga del piano: altezza piena, taglio ai lati.
-      const uScale = planeAspect / imgAspect;
-      return { uScale, vScale: 1, uOffset: (1 - uScale) / 2, vOffset: 0 };
+  function containFitSize(imgAspect) {
+    let width = FOG_WALL_WIDTH;
+    let height = width / imgAspect;
+    if (height > FOG_MAX_HEIGHT) {
+      height = FOG_MAX_HEIGHT;
+      width = height * imgAspect;
     }
-    // Immagine relativamente più stretta/alta del piano: larghezza piena, taglio sopra/sotto.
-    const vScale = imgAspect / planeAspect;
-    return { uScale: 1, vScale, uOffset: 0, vOffset: (1 - vScale) / 2 };
+    return { width, height };
   }
 
   const fogMats = FOG_TEXTURES.map((file, idx) => {
     const mat = new StandardMaterial("fogMat" + idx, scene);
     const tex = loadTexture(scene, file);
     tex.hasAlpha = true;
-    // CLAMP invece del wrap a ripetizione di default: con uScale/vScale < 1
-    // (il ritaglio "a copertura" qui sopra) e la deriva UV animata in
-    // update(), il wrap farebbe ricomparire visibilmente l'immagine ai
-    // bordi quando l'offset esce dalla finestra ritagliata.
+    // CLAMP invece del wrap a ripetizione di default: con la deriva UV
+    // animata in update() (oscilla oltre 0/1), il wrap farebbe ricomparire
+    // l'immagine ripetuta ai bordi invece di fermarsi sull'ultimo pixel.
     tex.wrapU = Texture.CLAMP_ADDRESSMODE;
     tex.wrapV = Texture.CLAMP_ADDRESSMODE;
     const size = fogImageSizes.get(file);
-    const fit = coverUvFit(size.width / size.height, fogPlaneAspect);
-    tex.uScale = fit.uScale;
-    tex.vScale = fit.vScale;
-    tex.uOffset = fit.uOffset;
-    tex.vOffset = fit.vOffset;
+    const planeSize = containFitSize(size.width / size.height);
     mat.diffuseTexture = tex;
     mat.useAlphaFromDiffuseTexture = true;
     mat.emissiveColor = new Color3(0.5, 0.5, 0.52); // grigio neutro: leggibile contro lo sfondo nero
@@ -613,12 +611,14 @@ export async function createGameScene({ engine, canvas, goto }) {
       uSpeed: 0.02 + idx * 0.01,
       vSpeed: 0.015 + idx * 0.008,
       file: file,
-      // Offset di base del ritaglio "a copertura": la deriva UV in update()
-      // deve oscillare attorno a questi valori, non sovrascriverli.
-      baseUOffset: fit.uOffset,
-      baseVOffset: fit.vOffset,
-      uScale: fit.uScale,
-      vScale: fit.vScale,
+      planeWidth: planeSize.width,
+      planeHeight: planeSize.height,
+      // Nessun ritaglio: il piano combacia con l'aspect ratio dell'immagine,
+      // quindi la texture copre l'intero UV senza offset/scale.
+      baseUOffset: 0,
+      baseVOffset: 0,
+      uScale: 1,
+      vScale: 1,
     };
   });
 
@@ -655,6 +655,14 @@ export async function createGameScene({ engine, canvas, goto }) {
     }
 
     fogWisp.material = fogState.mat.material;
+    // Piano ridimensionato per combaciare con l'aspect ratio (e il limite di
+    // altezza) calcolati per questa immagine — vedi containFitSize più sopra.
+    // Specchiato sull'asse Y (flip orizzontale) con probabilità 50%, per
+    // variare l'aspetto del velo senza bisogno di texture aggiuntive
+    // (backFaceCulling è già disattivato sul materiale, quindi resta visibile).
+    const mirrorSign = Math.random() < 0.5 ? -1 : 1;
+    fogWisp.scaling.x = mirrorSign * (fogState.mat.planeWidth / FOG_WALL_WIDTH);
+    fogWisp.scaling.y = fogState.mat.planeHeight / FOG_WALL_HEIGHT;
     // Distanza casuale (non più fissa) tra FOG_WALL_Z_MIN e FOG_WALL_Z_MAX:
     // il tragitto orizzontale va ricalcolato di conseguenza, dato che dipende
     // dalla distanza dalla camera.
