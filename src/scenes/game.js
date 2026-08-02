@@ -699,10 +699,15 @@ export async function createGameScene({ engine, canvas, goto }) {
     let mat = billboardMatCache.get(imgName);
     if (!mat) {
       mat = new StandardMaterial("billboardMat_" + imgName, scene);
-      mat.diffuseTexture = loadTexture(scene, imgName);
+      const tex = loadTexture(scene, imgName);
+      // Emissiva costante e non illuminata (disableLighting): la foto resta
+      // sempre ugualmente leggibile, indipendente da spawn/despawn delle luci.
+      mat.diffuseTexture = tex;
+      mat.emissiveTexture = tex;
+      mat.emissiveColor = new Color3(1, 1, 1);
+      mat.disableLighting = true;
       mat.specularColor = new Color3(0, 0, 0);
       mat.backFaceCulling = false; // visibile da entrambi i lati del piano
-      mat.maxSimultaneousLights = MAX_LIGHTS;
       billboardMatCache.set(imgName, mat);
     }
     return mat;
@@ -1007,10 +1012,12 @@ export async function createGameScene({ engine, canvas, goto }) {
 
     // Fila di monete su una corsia libera (a volte), lunghezza variabile
     // (1..coinRowLength) invece di sempre la stessa, per varietà.
+    let coinLane = null;
+    let coinRowCount = 0;
     if (Math.random() < G.coinSpawnChance) {
-      const coinLane = pickFreeLane();
-      const count = 1 + Math.floor(Math.random() * G.coinRowLength);
-      for (let k = 0; k < count; k++) {
+      coinLane = pickFreeLane();
+      coinRowCount = 1 + Math.floor(Math.random() * G.coinRowLength);
+      for (let k = 0; k < coinRowCount; k++) {
         const co = spawnFrom(coins);
         if (!co) break;
         co.active = true;
@@ -1025,8 +1032,16 @@ export async function createGameScene({ engine, canvas, goto }) {
 
     // Moneta bonus rara, indipendente dalla fila di monete normali: bassa
     // probabilità, valore moltiplicato (vedi G.redCoinChance/redCoinValueMultiplier).
+    // Evita la corsia della fila gialla quando possibile, e in ogni caso
+    // sposta la z se finisce comunque sulla stessa corsia: altrimenti la
+    // moneta rossa nasce esattamente sopra la prima moneta gialla (k=0
+    // condivide la stessa z di partenza state.nextSpawnZ).
     if (Math.random() < G.redCoinChance) {
-      const redLane = pickFreeLane();
+      const redFreeLanes = coinLane === null ? freeLanes : freeLanes.filter((l) => l !== coinLane);
+      const redLane = redFreeLanes.length
+        ? redFreeLanes[Math.floor(Math.random() * redFreeLanes.length)]
+        : pickFreeLane();
+      const redZ = redLane === coinLane ? state.nextSpawnZ + coinRowCount * 1.6 : state.nextSpawnZ;
       const red = spawnFrom(coins);
       if (red) {
         red.active = true;
@@ -1035,7 +1050,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         red.mesh.material = coinRedMat;
         red.mesh.setEnabled(true);
         red.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
-        red.mesh.position.set(LANES[redLane], 1.0, state.nextSpawnZ);
+        red.mesh.position.set(LANES[redLane], 1.0, redZ);
       }
     }
 
