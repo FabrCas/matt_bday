@@ -376,10 +376,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   magnetMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const hammerMat = new StandardMaterial("hammerMat", scene);
-  hammerMat.emissiveColor = new Color3(0.42, 0.28, 0.12);
+  hammerMat.emissiveColor = new Color3(1, 0.5, 0);
   hammerMat.diffuseColor = new Color3(0.15, 0.1, 0.04);
   hammerMat.specularColor = new Color3(0, 0, 0);
-  hammerMat.maxSimultaneousLights = MAX_LIGHTS;
+  // hammerMat.maxSimultaneousLights = MAX_LIGHTS;
+  hammerMat.disableLighting = true;
 
   const starMat = new StandardMaterial("starMat", scene);
   starMat.emissiveColor = new Color3(0.65, 0.55, 0.08);
@@ -524,7 +525,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // Per questo va temporaneamente rimossa (emissiveTexture: null) e
   // ripristinata al termine, insieme a emissiveIntensity (che su alcuni
   // export può essere 0, azzerando comunque l'emissivo).
-  const STAR_GLOW_COLOR = new Color3(1, 0.92, 0.45);
+  const STAR_GLOW_COLOR = new Color3(0.33, 0.305, 0.15);
   const playerBaseEmissive = playerMeshes
     .filter((m) => m.material && m.material.emissiveColor)
     .map((m) => ({
