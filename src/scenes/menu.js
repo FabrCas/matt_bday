@@ -18,9 +18,9 @@ import { CONFIG } from "../config/index.js";
 // Piano del logo: parte da sopra la vista e scende fino al centro, dove si
 // ferma (vedi update()). Per ora materiale a tinta unita: la texture reale
 // del logo verrà applicata in seguito (basta assegnarla a logoMat.diffuseTexture).
-const LOGO_TARGET_Y = 1; // stessa altezza a cui puntava la camera/la vecchia gem
-const LOGO_DROP_SPEED = 3; // unità/s
-const LOGO_SPIN_SPEED = 3; // rad/s, velocità delle due rotazioni (vedi update())
+const LOGO_TARGET_Y = 0.5; // stessa altezza a cui puntava la camera/la vecchia gem
+const LOGO_DROP_SPEED = 4; // unità/s
+const LOGO_SPIN_SPEED = 9; // rad/s, velocità delle due rotazioni (vedi update())
 const TWO_PI = Math.PI * 2;
 
 // Scena Menu: sfondo 3D leggero (il piano del logo che scende) + overlay HTML per i testi.
@@ -107,7 +107,13 @@ export function createMenuScene({ engine, goto }) {
     // camera), solo l'asse z produce un effetto di rotazione visibile — x/y
     // verrebbero sovrascritti dal billboard ad ogni frame.
     if (spinPhase === 0 || spinPhase === 1) {
-      const step = LOGO_SPIN_SPEED * dt;
+      let step;
+      if (spinPhase==0){
+        step  = LOGO_SPIN_SPEED * dt;
+      }
+      else{
+        step = LOGO_SPIN_SPEED/2 * dt;
+      }
       const dir = spinPhase === 0 ? 1 : -1;
       logoPlane.rotation.z += dir * step;
       spinProgress += step;
