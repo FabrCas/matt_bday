@@ -1190,7 +1190,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     let payout = computePayout(state.coins);
     const amount = payout[0];
     const diff_amount = CONFIG.economy.maxPayout - amount
-    const gameover_message = payout[1] ? "Complimenti per la vincita, ma noi abbiamo solo questi ..." : `${amount}€...\ndavvero?\n, ${diff_amount}€ te li offriamo noi.`
+    const gameover_message = payout[1] ? "Complimenti per la vincita, ma noi abbiamo solo questi ..." : `${amount}€...\ndavvero?\n ${diff_amount}€ te li offriamo noi.`
     console.log(amount);
     console.log(gameover_message);
     goto("gameover", { coins: state.coins, distance: state.distance, amount: CONFIG.economy.maxPayout, message: gameover_message});
