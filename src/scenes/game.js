@@ -314,31 +314,34 @@ export async function createGameScene({ engine, canvas, goto }) {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // Ostacoli e monete: LAMP_INTENSITY resta a 10 (voluto), quindi con
-  // l'illuminazione normale (diffuse * intensità luce) il colore va in
-  // clipping a bianco non appena un lampadario è vicino — un'emissiva
-  // aggiunta sopra il diffuse (come nel tentativo precedente) peggiora solo
-  // le cose, perché si somma a un diffuse già saturo. L'unico modo per non
-  // dipendere dall'intensità della luce (che deve poter restare alta) è
-  // ignorarla del tutto: disableLighting fa sì che il colore finale sia
-  // esattamente emissiveColor, costante, mai moltiplicato dalla luce. Il
-  // muro non è toccato: resta illuminato normalmente come richiesto.
+  // Ostacoli e monete: LAMP_INTENSITY resta a 10 (voluto), quindi con il
+  // colore diffuse "pieno" di prima (0.85-0.98) anche solo diffuse*intensità
+  // andava in clipping a bianco non appena un lampadario era vicino.
+  // disableLighting eliminava la reazione del tutto; qui invece si tiene
+  // acceso l'illuminamento ma con un diffuseColor tenuto basso, così il
+  // contributo delle luci resta un incremento moderato invece di saturare —
+  // l'emissiveColor dà il colore "di base" sempre visibile, il diffuse
+  // (ridotto) aggiunge la reazione più tenue alla luce vicina. Il muro non è
+  // toccato: resta illuminato normalmente come richiesto.
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
-  obstacleMat.emissiveColor = new Color3(0.85, 0.2, 0.25);
+  obstacleMat.emissiveColor = new Color3(0.5, 0.12, 0.15);
+  obstacleMat.diffuseColor = new Color3(0.2, 0.05, 0.06);
   obstacleMat.specularColor = new Color3(0, 0, 0);
-  obstacleMat.disableLighting = true;
+  obstacleMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const coinMat = new StandardMaterial("coinMat", scene);
-  coinMat.emissiveColor = new Color3(0.98, 0.75, 0.15);
+  coinMat.emissiveColor = new Color3(0.55, 0.42, 0.06);
+  coinMat.diffuseColor = new Color3(0.2, 0.15, 0.03);
   coinMat.specularColor = new Color3(0, 0, 0);
-  coinMat.disableLighting = true;
+  coinMat.maxSimultaneousLights = MAX_LIGHTS;
 
   // Moneta bonus rara (vedi G.redCoinChance/redCoinValueMultiplier): stesso
   // mesh della moneta normale, solo materiale diverso e valore moltiplicato.
   const coinRedMat = new StandardMaterial("coinRedMat", scene);
-  coinRedMat.emissiveColor = new Color3(0.9, 0.1, 0.12);
+  coinRedMat.emissiveColor = new Color3(0.5, 0.05, 0.06);
+  coinRedMat.diffuseColor = new Color3(0.18, 0.02, 0.025);
   coinRedMat.specularColor = new Color3(0, 0, 0);
-  coinRedMat.disableLighting = true;
+  coinRedMat.maxSimultaneousLights = MAX_LIGHTS;
 
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
