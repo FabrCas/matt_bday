@@ -8,5 +8,7 @@
 -- magnete: raccoglie tutte le monete
 -- martello spacca tutti gli ostacoli
 -- stella: invincibilita' per 30 S
-- aggiungere facce mancanti sull'ultima scena
+- aggiungere facce mancanti sull'ultima scena, mancano asset e inclusione path nel codice
 - ripensare la prima scena, aggiugnere base audio? 
+- aggiungere altre texture nel percorso
+- aggiungere tipologie di ostacoli solo dopo una certa distanza
