@@ -435,6 +435,31 @@ export async function createGameScene({ engine, canvas, goto }) {
     return themeIndexByBucket.get(bucket);
   }
 
+  // Ogni SCENERY_CHANGE_SFX_CHECK_EVERY cambi di tema dello scenario (un
+  // "cambio" = un nuovo bucket di GROUND_THEME_SWITCH_DISTANCE metri, quindi
+  // un nuovo tema pescato per pavimento/muri/soffitto — vedi la chiamata più
+  // sotto in update()), si tenta la riproduzione di geyyyy.mp3:
+  // - se la probabilità corrente è 0 (primo giro, o appena suonato), torna
+  //   al 25% prima del tiro di dado;
+  // - se suona: si azzera (tornerà al 25% dopo altri 4 cambi);
+  // - se non suona: sale di un altro 25% (fino al 100%, così prima o poi
+  //   suona per forza), e resta a quel valore fino al prossimo controllo a 4
+  //   cambi.
+  const SCENERY_CHANGE_SFX_CHECK_EVERY = 4;
+  const SCENERY_CHANGE_SFX_STEP = 0.25;
+  function maybeTriggerSceneryChangeSfx() {
+    state.sceneryChangeCount += 1;
+    if (state.sceneryChangeCount < SCENERY_CHANGE_SFX_CHECK_EVERY) return;
+    state.sceneryChangeCount = 0;
+    if (state.sceneryChangeSfxChance <= 0) state.sceneryChangeSfxChance = SCENERY_CHANGE_SFX_STEP;
+    if (Math.random() < state.sceneryChangeSfxChance) {
+      sceneryChangeSfx?.play();
+      state.sceneryChangeSfxChance = 0;
+    } else {
+      state.sceneryChangeSfxChance = Math.min(1, state.sceneryChangeSfxChance + SCENERY_CHANGE_SFX_STEP);
+    }
+  }
+
   function pickRandom(pool) {
     return pool[Math.floor(Math.random() * pool.length)];
   }
@@ -520,6 +545,12 @@ export async function createGameScene({ engine, canvas, goto }) {
   let soundpowerupstart = null;
   loadSound("mario_star.mp3", { volume: 0.7 , loop: true}).then((s) => {
     soundpowerupstart = s;
+  });
+
+  // Vedi maybeTriggerSceneryChangeSfx() più sotto per la logica di probabilità.
+  let sceneryChangeSfx = null;
+  loadSound("geyyyy.mp3", { volume: 0.8 }).then((s) => {
+    sceneryChangeSfx = s;
   });
 
   // Un suono di salto scelto a caso tra JUMP_SOUNDS ad ogni salto (vedi
@@ -1251,6 +1282,9 @@ export async function createGameScene({ engine, canvas, goto }) {
     fogTime: 0, // orologio indipendente dalla velocità, per il moto dei banchi di nebbia
     quietRowsRemaining: 0, // >0: righe senza spawn ancora da consumare, vedi spawnRow()
     consecutiveWideBlocks: 0, // blocchi orizzontali (2-3 corsie) piazzati di fila senza interruzioni, vedi spawnRow()
+    groundBucket: 0, // ultimo bucket di GROUND_THEME_SWITCH_DISTANCE metri visto, per rilevare un cambio di tema (vedi maybeTriggerSceneryChangeSfx())
+    sceneryChangeCount: 0, // cambi di tema dello scenario dall'ultimo controllo a 4 (vedi maybeTriggerSceneryChangeSfx())
+    sceneryChangeSfxChance: 0, // probabilità (0..1) che geyyyy.mp3 suoni al prossimo controllo a 4 cambi
   };
   // Ultimi valori effettivamente scritti nella HUD: distance/coins cambiano
   // in continuazione ma il valore mostrato (arrotondato) resta identico per
@@ -1595,7 +1629,12 @@ export async function createGameScene({ engine, canvas, goto }) {
     // per pezzo, man mano che il corridoio scorre e ricicla. Il tema del
     // bucket corrente è memorizzato (vedi themeForBucket()), non ricalcolato
     // a caso ad ogni frame.
-    const groundThemeIdx = themeForBucket(Math.floor(state.distance / GROUND_THEME_SWITCH_DISTANCE));
+    const groundBucket = Math.floor(state.distance / GROUND_THEME_SWITCH_DISTANCE);
+    if (groundBucket !== state.groundBucket) {
+      state.groundBucket = groundBucket;
+      maybeTriggerSceneryChangeSfx();
+    }
+    const groundThemeIdx = themeForBucket(groundBucket);
 
     // Movimento laterale (lerp verso la corsia target).
     player.position.x += (state.targetX - player.position.x) * Math.min(1, LANE_LERP * dt);
@@ -1881,7 +1920,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     disposeSound(soundtrack);
     disposeSound(soundghostmax);
     disposeSound(soundpowerupstart);
-    disposeSound(hurtsfx); 
+    disposeSound(sceneryChangeSfx);
+    disposeSound(hurtsfx);
     jumpSfx.forEach(disposeSound);
     disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });
     chandelierContainer.dispose();
