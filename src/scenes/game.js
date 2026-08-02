@@ -513,6 +513,20 @@ export async function createGameScene({ engine, canvas, goto }) {
     }
   }
 
+  // Bagliore del player durante il power-up stella (vedi activatePowerup()/
+  // update()): l'emissiveColor originale di ogni materiale viene salvata una
+  // sola volta qui, così può essere ripristinata esattamente com'era quando
+  // l'effetto termina, invece di un valore fisso indovinato a mano.
+  const STAR_GLOW_COLOR = new Color3(1, 0.92, 0.45);
+  const playerBaseEmissive = playerMeshes
+    .filter((m) => m.material && m.material.emissiveColor)
+    .map((m) => ({ mat: m.material, base: m.material.emissiveColor.clone() }));
+  function setPlayerGlow(active) {
+    for (const { mat, base } of playerBaseEmissive) {
+      mat.emissiveColor = active ? STAR_GLOW_COLOR : base;
+    }
+  }
+
   // ---- Pista: segmenti di terreno riciclati per effetto infinito ----
   // Larghezza pari alla distanza tra i due muri, così il pavimento li tocca
   // invece di lasciare uno spazio vuoto ai lati.
@@ -1373,7 +1387,17 @@ export async function createGameScene({ engine, canvas, goto }) {
       // così raccoglierne una seconda mentre la prima è ancora attiva non
       // dà un'invincibilità sproporzionatamente lunga.
       state.starTimer = STAR_DURATION;
+      // La soundtrack si mette in pausa mentre suona il tema della stella
+      // (vedi update(): riprende esattamente da dove si era fermata quando
+      // l'effetto termina). stop() prima di play() evita che una stella
+      // raccolta mentre una precedente è ancora attiva sovrapponga una
+      // seconda istanza del loop a quella già in corso (il bug per cui il
+      // suono "iniziava più volte": ogni .play() su un AbstractSound crea
+      // una nuova istanza invece di riavviare quella esistente).
+      soundtrack?.pause();
+      soundpowerupstart?.stop();
       soundpowerupstart?.play();
+      setPlayerGlow(true);
     }
   }
 
@@ -1549,12 +1573,18 @@ export async function createGameScene({ engine, canvas, goto }) {
     // Invincibilità da power-up stella (vedi activatePowerup()): a
     // differenza dell'invulnerabilità da colpo, nessun lampeggio (non è un
     // segnale di "appena colpito"), solo il conto alla rovescia mostrato in
-    // HUD più sotto.
-    if (state.starTimer > 0) {
+    // HUD più sotto. Il ripristino (tema stella/soundtrack/bagliore) va
+    // fatto una sola volta, esattamente nel frame in cui il timer arriva a
+    // 0 — non ad ogni frame in cui è già a 0, altrimenti soundtrack.play()
+    // ripartirebbe da capo in continuazione per tutta la partita.
+    const starWasActive = state.starTimer > 0;
+    if (starWasActive) {
       state.starTimer = Math.max(0, state.starTimer - dt);
     }
-    else {
+    if (starWasActive && state.starTimer <= 0) {
       soundpowerupstart?.stop();
+      soundtrack?.resume();
+      setPlayerGlow(false);
     }
     // Pausa post-martello (vedi activatePowerup()/spawnRow()): nessun
     // feedback HUD dedicato, la si nota semplicemente dall'assenza di
@@ -1692,6 +1722,8 @@ export async function createGameScene({ engine, canvas, goto }) {
     disposeSound(coinredSfx);
     disposeSound(powerupSfx);
     disposeSound(soundtrack);
+    disposeSound(soundghostmax);
+    disposeSound(soundpowerupstart);
     jumpSfx.forEach(disposeSound);
     disposeModel({ meshes: playerMeshes, animationGroups: playerAnimationGroups });
     scene.dispose();
