@@ -928,9 +928,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     c.rotation.z = Math.PI / 2;
     c.setEnabled(false);
     if (DEBUG) c.showBoundingBox = true;
-    scene.onBeforeRenderObservable.add(() => {
-        c.rotation.y += 0.1;
-    });
+    // Rotazione applicata nel loop delle monete attive in update() (una sola
+    // callback per frame invece di una scene.onBeforeRenderObservable per
+    // moneta): stesso incremento per frame di prima, ma senza il costo di 24
+    // sottoscrizioni separate che scattavano anche sulle monete disattivate.
     return { mesh: c, active: false, lane: 0, type: "coin", value: 1 };
   }
 
@@ -958,6 +959,12 @@ export async function createGameScene({ engine, canvas, goto }) {
     quietRowsRemaining: 0, // >0: righe senza spawn ancora da consumare, vedi spawnRow()
     consecutiveWideBlocks: 0, // blocchi orizzontali (2-3 corsie) piazzati di fila senza interruzioni, vedi spawnRow()
   };
+  // Ultimi valori effettivamente scritti nella HUD: distance/coins cambiano
+  // in continuazione ma il valore mostrato (arrotondato) resta identico per
+  // molti frame consecutivi. Scrivere nel DOM (textContent, ricostruzione
+  // della stringa cuori) solo quando cambia davvero evita un costo per-frame
+  // sprecato che contribuiva ai cali di frame.
+  const lastHud = { coins: null, distance: null, lives: null };
 
   function spawnRow() {
     // Pause brevi e periodiche senza alcuno spawn: danno respiro al ritmo di
@@ -1378,6 +1385,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       if (!co.active) continue;
       co.mesh.position.z -= move;
       co.mesh.rotation.x += dt * 6; // rotazione moneta
+      co.mesh.rotation.y += 0.1; // rotazione secondaria, stesso incremento per frame di prima
       // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
       co.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - co.mesh.position.z) / FADE_DISTANCE));
       if (Math.abs(co.mesh.position.z) < 0.9 && Math.abs(co.mesh.position.x - px) < 0.9 && Math.abs(py - 1.0) < 1.1) {
@@ -1400,12 +1408,19 @@ export async function createGameScene({ engine, canvas, goto }) {
     state.nextSpawnZ -= move;
     while (state.nextSpawnZ < SPAWN_AHEAD) spawnRow();
 
-    ui.updateHud({
-      coins: state.coins * CONFIG.economy.coinValue,
-      distance: state.distance,
-      lives: state.lives,
-      maxLives: MAX_LIVES,
-    });
+    const hudCoins = state.coins * CONFIG.economy.coinValue;
+    const hudDistance = Math.floor(state.distance);
+    if (hudCoins !== lastHud.coins || hudDistance !== lastHud.distance || state.lives !== lastHud.lives) {
+      lastHud.coins = hudCoins;
+      lastHud.distance = hudDistance;
+      lastHud.lives = state.lives;
+      ui.updateHud({
+        coins: hudCoins,
+        distance: hudDistance,
+        lives: state.lives,
+        maxLives: MAX_LIVES,
+      });
+    }
   }
 
   function dispose() {

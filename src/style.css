@@ -178,19 +178,31 @@ html, body {
   left: 0;
   right: 0;
   display: flex;
+  flex-wrap: nowrap; /* mai su due righe: vedi .hud-item per il motivo del wrap che risolveva */
   justify-content: center;
-  gap: 1.5rem;
+  gap: clamp(0.4rem, 2.5vw, 1.5rem); /* si stringe su schermi stretti invece di forzare l'a capo */
+  padding-inline: 0.4rem;
   z-index: 5;
   pointer-events: none;
 }
 
 .hud-item {
-  font-size: clamp(1.1rem, 5vw, 1.5rem);
+  /* clamp più basso di prima: su telefoni stretti, con gap/padding ridotti
+     qui sotto, evita che 3 pill affiancate debbano già rimpicciolirsi al
+     valore minimo per un valore breve. */
+  font-size: clamp(0.85rem, 4vw, 1.5rem);
   font-weight: 700;
-  padding: 0.35rem 0.9rem;
+  padding: clamp(0.25rem, 1.2vw, 0.35rem) clamp(0.5rem, 2.5vw, 0.9rem);
   background: rgba(15, 23, 42, 0.55);
   border-radius: 999px;
   backdrop-filter: blur(4px);
+  /* Il vero motivo del "va a due righe": un flex item di default può
+     restringersi sotto la larghezza del proprio testo, e con white-space
+     normale il testo interno (icona + numero) va a capo per starci dentro.
+     nowrap lo impedisce: la pill resta su una riga, al più leggermente più
+     larga, invece di raddoppiare in altezza. */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* Flash rosso al momento di un colpo (vedi ui.flashHit()): appare di scatto
