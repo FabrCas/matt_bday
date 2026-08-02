@@ -49,7 +49,7 @@ export function createMenuScene({ engine, goto }) {
   const logoRestY = screenTopY - logoHeight / 2; // posizione finale, dopo la discesa
   const logoStartY = screenTopY + logoHeight; // sopra la vista, fuori schermo
 
-  const image_logo = loadTexture(scene, "stanis_hd.jpg")
+  const image_logo = loadTexture(scene, "glanis_bday.png")
 
   const logoPlane = MeshBuilder.CreatePlane("logoPlane", { width: logoWidth, height: logoHeight }, scene);
   const logoMat = new StandardMaterial("logoMat", scene);
