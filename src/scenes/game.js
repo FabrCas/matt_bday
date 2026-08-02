@@ -22,7 +22,7 @@ import { loadSound, disposeSound } from "../utils/audioLoader.js";
 
 // Modello del player: static/assets/3d-models/test.glb
 const PLAYER_MODEL = "matt.glb";
-const CHANDELIER_MODEL = "lamp_2.glb";
+const CHANDELIER_MODEL = "lamp.glb";
 
 // Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
 // a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
@@ -79,7 +79,7 @@ const START_SPEED = G.startSpeed; // unità/s in avanti (mondo che scorre)
 const MAX_SPEED = G.maxSpeed;
 const ACCEL = G.acceleration; // incremento velocità nel tempo
 const SPAWN_AHEAD = G.spawnAhead; // distanza a cui vengono generati gli oggetti
-const DESPAWN_BEHIND = - 40; // dietro la camera -> riciclo/rimozione (interno)
+const DESPAWN_BEHIND = - 10; // dietro la camera -> riciclo/rimozione (interno)
 const ROW_GAP = G.rowGap; // distanza tra le "righe" di ostacoli/monete
 const FADE_DISTANCE = 16; // unità percorse per dissolvere in ostacoli/monete allo spawn
 const DEBUG = CONFIG.debug; // se true, mostra la hitbox (bounding box) di ogni oggetto
@@ -100,7 +100,7 @@ const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
-const LAMP_INTENSITY = 2;
+const LAMP_INTENSITY = 10;
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
