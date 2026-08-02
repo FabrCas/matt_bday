@@ -1233,6 +1233,24 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
   const obstacles = Object.values(obstaclesByType).flat(); // scorrimento/riciclo unico in update()
 
+  // Bordo bianco su ogni cubo, per renderli più visibili/leggibili contro le
+  // nuove texture dei blocchi (vedi BLOCK_THEMES): usa l'outline rendering
+  // nativo di Babylon (una seconda passata, mesh rigonfiata lungo le normali
+  // e disegnata dietro), non richiede geometria/materiale aggiuntivi. Va
+  // impostato una sola volta per mesh (è una proprietà della mesh, non del
+  // materiale, quindi non serve ripeterlo ad ogni changeBlockTheme()).
+  const OBSTACLE_OUTLINE_WIDTH = 0.03;
+  const OBSTACLE_OUTLINE_COLOR = Color3.White();
+  function enableOutline(mesh) {
+    mesh.renderOutline = true;
+    mesh.outlineColor = OBSTACLE_OUTLINE_COLOR;
+    mesh.outlineWidth = OBSTACLE_OUTLINE_WIDTH;
+  }
+  for (const ob of obstacles) {
+    enableOutline(ob.mesh);
+    ob.mesh.getChildMeshes().forEach(enableOutline);
+  }
+
   // Texture dei blocchi (vedi BLOCK_THEMES/blockMats più sopra): un solo
   // tema alla volta, applicato a TUTTI gli ostacoli in pista (pool incluso,
   // non solo quelli attivi) e cambiato ad ogni cambio di scenario (vedi
