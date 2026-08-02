@@ -484,6 +484,9 @@ export async function createGameScene({ engine, canvas, goto }) {
   const magnetContainer = await loadModelContainer(scene, MAGNET_MODEL);
 
 
+  // modello stella
+  const starContainer = await loadModelContainer(scene, STAR_MODEL);
+
   // Fix per materiali importati da glb (player, lampadari, ecc.):
   // 1) stesso cap di luci degli altri materiali della scena (vedi MAX_LIGHTS
   //    più sopra) — senza questo, con directional + N point light dei
