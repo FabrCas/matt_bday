@@ -106,6 +106,13 @@ const LAMP_INTENSITY = 10;
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
 // in modo visibile, dando l'effetto di "spegnimento di colpo".
 const LAMP_FADE_DISTANCE = LAMP_GAP*0.25;
+// Le point light dei lampadari, a differenza degli altri oggetti (ostacoli,
+// monete, billboard: tutti riciclati a DESPAWN_BEHIND), vengono riciclate
+// molto più indietro: DESPAWN_BEHIND è troppo vicino alla camera, quindi la
+// luce si spegneva/teletrasportava mentre illuminava ancora in modo visibile
+// oggetti non ancora scomparsi. Margine extra oltre LAMP_GAP per stare ben
+// oltre la portata utile della luce.
+const DESPAWN_POINT_LIGHT = -(LAMP_GAP + 5);
 // StandardMaterial limita di default a 4 le luci che possono illuminare
 // contemporaneamente una mesh (`maxSimultaneousLights`). Con hemi + N point
 // light dei lampadari si supera facilmente quel budget, e Babylon ne scarta
@@ -1272,7 +1279,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     }
     for (const l of lamps) {
       l.model.position.z -= move;
-      if (l.model.position.z < DESPAWN_BEHIND) {
+      if (l.model.position.z < DESPAWN_POINT_LIGHT) {
         l.model.position.z += LAMP_GAP * LAMP_COUNT;
       }
       // Luce sempre allineata al modello: posizione ricavata da esso ogni
@@ -1284,8 +1291,10 @@ export async function createGameScene({ engine, canvas, goto }) {
 
       // Dissolvenza vicino al bordo di riciclo: l'intensità scende a 0 prima
       // che il lampadario venga teletrasportato in avanti, così il "salto"
-      // non si vede più come uno spegnimento improvviso.
-      const distFromRecycle = l.model.position.z - DESPAWN_BEHIND;
+      // non si vede più come uno spegnimento improvviso. Basata su
+      // DESPAWN_POINT_LIGHT (non DESPAWN_BEHIND): la luce deve restare piena
+      // ben oltre il punto in cui gli altri oggetti sono già stati riciclati.
+      const distFromRecycle = l.model.position.z - DESPAWN_POINT_LIGHT;
       const fade = Math.min(1, Math.max(0, distFromRecycle / LAMP_FADE_DISTANCE));
       l.light.intensity = LAMP_INTENSITY * fade;
     }
