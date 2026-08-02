@@ -1281,26 +1281,30 @@ export async function createGameScene({ engine, canvas, goto }) {
   }
 
   // Texture dei blocchi (vedi BLOCK_THEMES/blockMatsByTheme più sopra): un
-  // solo TEMA alla volta per tutti gli ostacoli in pista (pool incluso, non
-  // solo quelli attivi), cambiato ad ogni cambio di scenario (vedi update(),
-  // stesso evento dello switch di TILE_THEMES) — ma ogni ostacolo pesca
-  // indipendentemente una VARIANTE (rotazione UV) a caso dal pool di quel
-  // tema, così non sembrano tutti uguali pur condividendo lo stesso set di
-  // texture. Ogni ostacolo (cube o columnV/wall2/wall3, ormai tutti mesh
-  // singole fuse — vedi makeCubeGroup) ha il materiale sulla mesh stessa;
-  // getChildMeshes() è solo difensivo, per eventuali tipi futuri con
-  // gerarchia.
+  // solo tema+rotazione alla volta ("currentBlockMat"), cambiato ad ogni
+  // cambio di scenario (vedi update(), stesso evento dello switch di
+  // TILE_THEMES). A differenza di prima, changeBlockTheme() NON riassegna
+  // il materiale agli ostacoli già in pista (attivi o no): si limita ad
+  // aggiornare quale materiale verrà usato dai PROSSIMI ostacoli spawnati
+  // (vedi spawnRow()) — altrimenti un ostacolo già visibile cambierebbe
+  // texture all'improvviso sotto gli occhi del giocatore, e tutti gli
+  // ostacoli in pista in quel momento (spawnati con temi diversi) sarebbero
+  // ricoperti dallo stesso nuovo materiale tutti insieme, perdendo la
+  // transizione graduale che pavimento/muri/soffitto hanno già (un pezzo
+  // alla volta, al riciclo). Un solo materiale condiviso (non un pool scelto
+  // a caso per ostacolo) garantisce anche che i blocchi che compongono uno
+  // stesso ostacolo orizzontale — e quelli spawnati nello stesso periodo —
+  // mostrino sempre la stessa identica orientazione.
   function setObstacleMaterial(mesh, mat) {
     mesh.material = mat;
     mesh.getChildMeshes().forEach((child) => (child.material = mat));
   }
+  let currentBlockMat = null;
   function changeBlockTheme() {
     const pool = blockMatsByTheme[Math.floor(Math.random() * blockMatsByTheme.length)];
-    for (const ob of obstacles) {
-      setObstacleMaterial(ob.mesh, pool[Math.floor(Math.random() * pool.length)]);
-    }
+    currentBlockMat = pool[Math.floor(Math.random() * pool.length)];
   }
-  changeBlockTheme(); // tema iniziale, prima che qualunque ostacolo venga mai mostrato
+  changeBlockTheme(); // tema iniziale, usato dal primo spawnRow() in poi
 
   function makeCoin(i) {
     const c = MeshBuilder.CreateCylinder("coin" + i, { diameter: 0.8, height: 0.12, tessellation: 16 }, scene);
@@ -1483,6 +1487,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       if (ob) {
         ob.active = true;
         ob.lane = startLane;
+        setObstacleMaterial(ob.mesh, currentBlockMat); // il tema corrente al momento dello spawn (vedi changeBlockTheme())
         ob.mesh.setEnabled(true);
         ob.mesh.visibility = 0; // dissolve in gradualmente, vedi update()
         ob.mesh.position.x = obsCenterX;
