@@ -1556,9 +1556,13 @@ export async function createGameScene({ engine, canvas, goto }) {
     for (const pt of POWERUP_TYPES) {
       if (Math.random() >= pt.spawnChance) continue;
       const puFreeLanes = freeLanes.filter((l) => !usedLanesThisRow.includes(l));
-      const puLane = puFreeLanes.length
-        ? puFreeLanes[Math.floor(Math.random() * puFreeLanes.length)]
-        : pickFreeLane();
+      // A differenza di monete/moneta rossa (che con un blocco a 3 corsie
+      // finiscono comunque su una corsia coperta, "va bene" perché tutta la
+      // corsia va saltata a prescindere), un power-up in quel caso non deve
+      // MAI ricadere su una corsia con un ostacolo: niente fallback a
+      // pickFreeLane(), si salta del tutto il power-up per questa riga.
+      if (puFreeLanes.length === 0) continue;
+      const puLane = puFreeLanes[Math.floor(Math.random() * puFreeLanes.length)];
       const puZ = usedLanesThisRow.includes(puLane)
         ? state.nextSpawnZ + Math.max(coinRowCount, 1) * 1.6
         : state.nextSpawnZ;
