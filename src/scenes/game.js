@@ -314,23 +314,33 @@ export async function createGameScene({ engine, canvas, goto }) {
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
+  // Ostacoli e monete: reazione alla luce ridotta rispetto a pavimento/muri
+  // (quelli restano com'erano). Un'emissiva costante alza il "pavimento" di
+  // luminosità indipendente dalle luci di scena, così il colore resta
+  // riconoscibile anche quando un lampadario è lontano/spento, invece di
+  // affidarsi solo al componente diffuse (che segue in pieno l'intensità
+  // della luce più vicina).
   const obstacleMat = new StandardMaterial("obstacleMat", scene);
   obstacleMat.diffuseColor = new Color3(0.85, 0.2, 0.25);
+  obstacleMat.emissiveColor = new Color3(0.32, 0.075, 0.09);
   obstacleMat.specularColor = new Color3(0, 0, 0);
   obstacleMat.maxSimultaneousLights = MAX_LIGHTS;
 
   const coinMat = new StandardMaterial("coinMat", scene);
   coinMat.diffuseColor = new Color3(0.98, 0.75, 0.15);
-  coinMat.emissiveColor = new Color3(0.4, 0.3, 0.0);
-  coinMat.specularColor = new Color3(1, 1, 1);
+  coinMat.emissiveColor = new Color3(0.55, 0.42, 0.05);
+  // Niente più highlight speculare bianco (reagiva vistosamente al passaggio
+  // dei lampadari): il luccichio della moneta resta solo nel colore, non in
+  // un riflesso che si accende/spegne con le luci vicine.
+  coinMat.specularColor = new Color3(0, 0, 0);
   coinMat.maxSimultaneousLights = MAX_LIGHTS;
 
   // Moneta bonus rara (vedi G.redCoinChance/redCoinValueMultiplier): stesso
   // mesh della moneta normale, solo materiale diverso e valore moltiplicato.
   const coinRedMat = new StandardMaterial("coinRedMat", scene);
   coinRedMat.diffuseColor = new Color3(0.9, 0.1, 0.12);
-  coinRedMat.emissiveColor = new Color3(0.55, 0.03, 0.03);
-  coinRedMat.specularColor = new Color3(1, 1, 1);
+  coinRedMat.emissiveColor = new Color3(0.7, 0.05, 0.05);
+  coinRedMat.specularColor = new Color3(0, 0, 0);
   coinRedMat.maxSimultaneousLights = MAX_LIGHTS;
 
   // ---- Suoni ----
