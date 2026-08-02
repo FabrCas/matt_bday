@@ -25,7 +25,6 @@ const PLAYER_MODEL = "matt.glb";
 const CHANDELIER_MODEL = "lamp.glb";
 const MAGNET_MODEL = "magnet.glb";
 const STAR_MODEL = "star.glb";
-const STAR_MODEL = "star.glb";
 
 // Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
 // a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
