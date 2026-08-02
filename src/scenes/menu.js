@@ -20,7 +20,8 @@ import { CONFIG } from "../config/index.js";
 // del logo verrà applicata in seguito (basta assegnarla a logoMat.diffuseTexture).
 const LOGO_TARGET_Y = 1; // stessa altezza a cui puntava la camera/la vecchia gem
 const LOGO_DROP_SPEED = 3; // unità/s
-const LOGO_SPIN_SPEED = 1; // rad/s, rotazione continua sul proprio asse (vedi update())
+const LOGO_SPIN_SPEED = 3; // rad/s, velocità delle due rotazioni (vedi update())
+const TWO_PI = Math.PI * 2;
 
 // Scena Menu: sfondo 3D leggero (il piano del logo che scende) + overlay HTML per i testi.
 export function createMenuScene({ engine, goto }) {
@@ -70,6 +71,14 @@ export function createMenuScene({ engine, goto }) {
   logoPlane.billboardMode = Mesh.BILLBOARDMODE_ALL;
 
 
+  // Rotazione del logo in due fasi (vedi update()): un giro completo (2π) in
+  // un verso, poi un giro completo nel verso opposto (torna esattamente
+  // all'orientamento di partenza), poi si ferma. spinProgress accumula i
+  // radianti percorsi nella fase corrente, per sapere quando i 360° sono
+  // completi indipendentemente dal framerate.
+  let spinPhase = 0; // 0 = avanti, 1 = indietro, 2 = fermo
+  let spinProgress = 0;
+
   ui.show("menu");
 
   // Se in debug si salta la schermata comandi (comodo durante lo sviluppo,
@@ -94,11 +103,22 @@ export function createMenuScene({ engine, goto }) {
     if (logoPlane.position.y > logoRestY) {
       logoPlane.position.y = Math.max(logoRestY, logoPlane.position.y - LOGO_DROP_SPEED * dt);
     }
-    // Rotazione continua sul proprio asse: essendo in BILLBOARDMODE_ALL (il
-    // piano resta sempre frontale alla camera), solo l'asse z produce un
-    // effetto di rotazione visibile — x/y verrebbero sovrascritti dal
-    // billboard ad ogni frame.
-    logoPlane.rotation.z += LOGO_SPIN_SPEED * dt;
+    // Essendo in BILLBOARDMODE_ALL (il piano resta sempre frontale alla
+    // camera), solo l'asse z produce un effetto di rotazione visibile — x/y
+    // verrebbero sovrascritti dal billboard ad ogni frame.
+    if (spinPhase === 0 || spinPhase === 1) {
+      const step = LOGO_SPIN_SPEED * dt;
+      const dir = spinPhase === 0 ? 1 : -1;
+      logoPlane.rotation.z += dir * step;
+      spinProgress += step;
+      if (spinProgress >= TWO_PI) {
+        // Corregge l'eventuale sforamento oltre i 360° esatti (dt variabile),
+        // così il giro di ritorno riparte/termina sempre allineato.
+        logoPlane.rotation.z -= dir * (spinProgress - TWO_PI);
+        spinProgress = 0;
+        spinPhase += 1;
+      }
+    }
   }
 
   function dispose() {
