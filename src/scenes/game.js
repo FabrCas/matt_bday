@@ -25,6 +25,7 @@ const PLAYER_MODEL = "matt.glb";
 const CHANDELIER_MODEL = "lamp.glb";
 const MAGNET_MODEL = "magnet.glb";
 const STAR_MODEL = "star.glb";
+const STAR_MODEL = "star.glb";
 
 // Immagini dei cartelloni ai lati della strada (static/assets/imgs/), pescate
 // a caso da CONFIG.billboards.images (vedi createBillboardImageBag più sotto).
@@ -133,6 +134,7 @@ const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
 const LAMP_INTENSITY = 10;
 const MAGNET_MODEL_SCALE = 0.4; // tarare in base alle dimensioni reali del modello magnet.glb
+const STAR_MODEL_SCALE = 0.4; // tarare in base alle dimensioni reali del modello star.glb
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
 // sfuma a 0 prima del riciclo: senza questa dissolvenza il lampadario
 // veniva teletrasportato in avanti mentre la sua luce contribuiva ancora
@@ -375,22 +377,17 @@ export async function createGameScene({ engine, canvas, goto }) {
   coinRedMat.specularColor = new Color3(0, 0, 0);
   coinRedMat.maxSimultaneousLights = MAX_LIGHTS;
 
-  // Power-up (martello/stella): stesso schema di monete/ostacoli (emissivo
+  // Power-up (martello): stesso schema di monete/ostacoli (emissivo
   // dominante, diffuse tenuto basso) per non reagire troppo alle luci pur
-  // restando illuminati. Il magnete usa invece il modello importato
-  // (magnet.glb, vedi makeMagnet()) coi suoi materiali originali.
+  // restando illuminato. Magnete e stella usano invece i modelli importati
+  // (magnet.glb/star.glb, vedi makeMagnet()/makeStar()) coi loro materiali
+  // originali.
   const hammerMat = new StandardMaterial("hammerMat", scene);
   hammerMat.emissiveColor = new Color3(1, 0.5, 0);
   hammerMat.diffuseColor = new Color3(0.15, 0.1, 0.04);
   hammerMat.specularColor = new Color3(0, 0, 0);
   // hammerMat.maxSimultaneousLights = MAX_LIGHTS;
   hammerMat.disableLighting = true;
-
-  const starMat = new StandardMaterial("starMat", scene);
-  starMat.emissiveColor = new Color3(0.65, 0.55, 0.08);
-  starMat.diffuseColor = new Color3(0.2, 0.17, 0.02);
-  starMat.specularColor = new Color3(0, 0, 0);
-  starMat.maxSimultaneousLights = MAX_LIGHTS;
 
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
@@ -484,7 +481,11 @@ export async function createGameScene({ engine, canvas, goto }) {
   const magnetContainer = await loadModelContainer(scene, MAGNET_MODEL);
 
 
-  // modello stella
+  // ---- Modello stella (glb) ----
+  // Stesso schema di lampadario/magnete: caricato una sola volta come
+  // AssetContainer e istanziato per ogni slot del pool (vedi makeStar() più
+  // sotto), al posto della dipiramide pentagonale procedurale usata finché
+  // non era disponibile l'asset.
   const starContainer = await loadModelContainer(scene, STAR_MODEL);
 
   // Fix per materiali importati da glb (player, lampadari, ecc.):
@@ -1108,12 +1109,24 @@ export async function createGameScene({ engine, canvas, goto }) {
     return makePowerupCommon(root, "hammer");
   }
   function makeStar(i) {
-    // type 11 = dipiramide pentagonale (J13): a punta su entrambi i lati,
-    // la forma sfaccettata più vicina a una "gemma a stella" tra i
-    // poliedri disponibili in Babylon senza costruire geometria custom.
-    const m = MeshBuilder.CreatePolyhedron("star" + i, { type: 11, size: 0.5 }, scene);
-    m.material = starMat;
-    return makePowerupCommon(m, "star");
+    // instantiateModelsToScene clona la gerarchia di nodi ma riusa i
+    // materiali (cloneMaterials: false), come per lampadari e magnete:
+    // tutte le istanze condividono le stesse texture/draw call di materiale.
+    const { rootNodes } = starContainer.instantiateModelsToScene(
+      (name) => `${name}_star${i}`,
+      false
+    );
+    const model = rootNodes[0];
+    // Stesso fix del player/magnete: l'import glTF spesso imposta
+    // rotationQuaternion sulla root, e quando presente Babylon ignora
+    // silenziosamente .rotation — senza azzerarlo, l'incremento di
+    // rotation.y nel loop dei power-up (update()) non avrebbe alcun effetto
+    // visibile.
+    model.rotationQuaternion = null;
+    model.scaling.set(STAR_MODEL_SCALE, STAR_MODEL_SCALE, STAR_MODEL_SCALE);
+    if (DEBUG) model.getChildMeshes().forEach((m) => (m.showBoundingBox = true));
+    fixImportedMaterials(model.getChildMeshes());
+    return makePowerupCommon(model, "star");
   }
 
   const powerupsByKind = {
