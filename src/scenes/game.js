@@ -261,7 +261,7 @@ const LAMP_COUNT = 4; // numero di lampadari attivi contemporaneamente
 const LAMP_BOX_Y = WALL_HEIGHT - 1; // vicino al soffitto
 const LAMP_LIGHT_DROP = 0.3; // quanto la point light sta sotto il modello
 const CHANDELIER_SCALE = 0.5; // tarare in base alle dimensioni reali del modello lamp.glb
-const LAMP_INTENSITY = 10;
+const LAMP_INTENSITY = 20;
 const MAGNET_MODEL_SCALE = 0.4; // tarare in base alle dimensioni reali del modello magnet.glb
 const STAR_MODEL_SCALE = 0.4; // tarare in base alle dimensioni reali del modello star.glb
 // Distanza (in unità di mondo, oltre DESPAWN_BEHIND) su cui l'intensità
@@ -379,7 +379,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // const hemi = new HemisphericLight("hemi", new Vector3(0, 0, 1), scene);
   // hemi.intensity = 0.01;
   const direct = new DirectionalLight("directional", new Vector3(0,-1,1), scene);
-  direct.intensity = 1; // alzata: 0.5 rendeva il player poco reattivo alla luce
+  direct.intensity = 1.5; // alzata: 0.5 rendeva il player poco reattivo alla luce
   direct.specular = new Color3(1, 1, 1);
 
   // Luce dedicata che segue il player (aggiornata in update()): a differenza
