@@ -43,23 +43,81 @@ const JUMP_SOUNDS = [
   "salto greve 2.mp3"
 ]
 
-// Set di texture PBR per pavimento/muri (static/assets/imgs/tiles/).
+// Set di texture PBR per pavimento/muri/soffitto (static/assets/imgs/tiles/).
 // "_gl" per la normal map: è la convenzione OpenGL (canale G verso l'alto),
 // quella che Babylon/WebGL si aspetta di default — "_dx" (DirectX, G invertito)
 // darebbe un bump map illuminato al contrario.
-const TILE_BASECOLOR = "tiles/ground_tiles_03_basecolor_1k.png";
-const TILE_NORMAL = "tiles/ground_tiles_03_normal_gl_1k.png";
-const TILE_AO = "tiles/ground_tiles_03_ambient_occlusion_1k.png";
-const TILE_ROUGHNESS = "tiles/ground_tiles_03_roughness_1k.png";
-
-const TILE_BASECOLOR_1 = "tiles/ground_tiles_24_baseColo_1k.png";
-const TILE_NORMAL_1 = "tiles/ground_tiles_24_normal_gl_1k.png";
-const TILE_AO_1 = "tiles/ground_tiles_24_ambientOcclusion_1k.png";
-const TILE_ROUGHNESS_1 = "tiles/ground_tiles_24_roughness_1k.png";
-// Ogni GROUND_THEME_SWITCH_DISTANCE metri percorsi il pavimento alterna tra
-// il set "03" (sopra) e il set "24" (qui sopra): 0-1000m set 03, 1000-2000m
-// set 24, 2000-3000m di nuovo 03, e così via (vedi update()).
+// Ogni GROUND_THEME_SWITCH_DISTANCE metri percorsi il pavimento/muri/soffitto
+// passano a un nuovo set scelto a caso tra quelli qui sotto (0-1000m sempre
+// il primo, ground_tiles_03; 1000-2000m, 2000-3000m, ecc. uno a caso tra
+// tutti — vedi themeForBucket() più sotto). `randomRotation: true` fa sì che
+// ogni pezzo riciclato con quel set peschi un orientamento UV casuale
+// (texture non "direzionale", es. erba/pattern irregolari); `false` mantiene
+// sempre lo stesso orientamento (texture con una direzione riconoscibile,
+// es. assi del legno o piastrelle con una griglia visibile).
 const GROUND_THEME_SWITCH_DISTANCE = 1000;
+const TILE_THEMES = [
+  {
+    name: "ground_tiles_03",
+    randomRotation: false,
+    files: {
+      basecolor: "tiles/ground_tiles_03_basecolor_1k.png",
+      normal: "tiles/ground_tiles_03_normal_gl_1k.png",
+      ao: "tiles/ground_tiles_03_ambient_occlusion_1k.png",
+      roughness: "tiles/ground_tiles_03_roughness_1k.png",
+    },
+  },
+  {
+    name: "ground_tiles_24",
+    randomRotation: true,
+    files: {
+      basecolor: "tiles/ground_tiles_24_baseColo_1k.png",
+      normal: "tiles/ground_tiles_24_normal_gl_1k.png",
+      ao: "tiles/ground_tiles_24_ambientOcclusion_1k.png",
+      roughness: "tiles/ground_tiles_24_roughness_1k.png",
+    },
+  },
+  {
+    name: "floor_tiles_13",
+    randomRotation: false,
+    files: {
+      basecolor: "tiles/floor_tiles_13_basecolor_1k.png",
+      normal: "tiles/floor_tiles_13_normal_gl_1k.png",
+      ao: "tiles/floor_tiles_13_ambientocclusion_1k.png",
+      roughness: "tiles/floor_tiles_13_roughness_1k.png",
+    },
+  },
+  {
+    name: "grass_01",
+    randomRotation: true,
+    files: {
+      basecolor: "tiles/grass_01_color_1k.png",
+      normal: "tiles/grass_01_normal_gl_1k.png",
+      ao: "tiles/grass_01_ambient_occlusion_1k.png",
+      roughness: "tiles/grass_01_roughness_1k.png",
+    },
+  },
+  {
+    name: "ground_07",
+    randomRotation: false,
+    files: {
+      basecolor: "tiles/ground_07_basecolor_1k.png",
+      normal: "tiles/ground_07_normal_gl_1k.png",
+      ao: "tiles/ground_07_ambientocclusion_1k.png",
+      roughness: "tiles/ground_07_roughness_1k.png",
+    },
+  },
+  {
+    name: "wood_planks_07",
+    randomRotation: false,
+    files: {
+      basecolor: "tiles/wood_planks_07_color_1k.png",
+      normal: "tiles/wood_planks_07_normal_gl_1k.png",
+      ao: "tiles/wood_planks_07_ambient_occlusion_1k.png",
+      roughness: "tiles/wood_planks_07_roughness_1k.png",
+    },
+  },
+];
 // La height map non è usata: richiederebbe parallax occlusion mapping
 // (Babylon la legge dal canale alpha della normal map, che andrebbe
 // ricomposta a runtime unendo le due immagini) per un costo GPU per-pixel
@@ -262,18 +320,14 @@ export async function createGameScene({ engine, canvas, goto }) {
 
 
   // ---- Materiali condivisi (riuso => meno draw call/allocazioni) ----
-  // Pavimento/muri (e soffitto, che riusa wallMat) in PBR con il set di
-  // texture in static/assets/imgs/tiles/. `makeTiledPbrMaterial` carica le
-  // 4 mappe e imposta la ripetizione UV in base alla dimensione reale della
-  // superficie, così la texture non risulta stirata su pavimento/muri che
-  // hanno proporzioni molto diverse tra loro.
+  // Pavimento/muri/soffitto in PBR con i set di texture in
+  // static/assets/imgs/tiles/ (vedi TILE_THEMES più sopra).
+  // `makeTiledPbrMaterial` carica le 4 mappe di un set e imposta la
+  // ripetizione UV in base alla dimensione reale della superficie, così la
+  // texture non risulta stirata su pavimento/muri che hanno proporzioni
+  // molto diverse tra loro.
   function makeTiledPbrMaterial(name, repeatU, repeatV, files) {
-    const {
-      basecolor = TILE_BASECOLOR,
-      normal: normalFile = TILE_NORMAL,
-      ao: aoFile = TILE_AO,
-      roughness: roughnessFile = TILE_ROUGHNESS,
-    } = files || {};
+    const { basecolor, normal: normalFile, ao: aoFile, roughness: roughnessFile } = files;
     const mat = new PBRMaterial(name, scene);
     const albedo = loadTexture(scene, basecolor);
     const normal = loadTexture(scene, normalFile);
@@ -309,39 +363,60 @@ export async function createGameScene({ engine, canvas, goto }) {
   // WALL_HEIGHT) assumendo una tile ~2 unità di mondo per ripetizione:
   // aggiustare qui se la texture risulta troppo piccola/grande a schermo.
   const repeat_factor = 6;
-  const groundMatA = makeTiledPbrMaterial("groundMatA", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
 
-  const wallMat = makeTiledPbrMaterial("wallMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
-  wallMat.backFaceCulling = false;
-
-  // Pool di materiali per il set di texture alternativo "24" (vedi update():
-  // pavimento/muri/soffitto passano a questo set ogni
-  // GROUND_THEME_SWITCH_DISTANCE metri, ma solo pezzo per pezzo man mano che
-  // vengono riciclati — non tutti insieme, vedi commento nel loop di
-  // scorrimento). Più istanze per superficie, ciascuna con la propria
-  // rotazione UV casuale (wAng): altrimenti, essendo tutti i pezzi la stessa
-  // immagine con lo stesso orientamento, il risultato è visivamente troppo
-  // regolare. Ad ogni riciclo se ne pesca una a caso dal pool.
-  function makeThemeBMatPool(namePrefix, count, repeatU, repeatV) {
-    return Array.from({ length: count }, (_, i) => {
-      const mat = makeTiledPbrMaterial(`${namePrefix}${i}`, repeatU, repeatV, {
-        basecolor: TILE_BASECOLOR_1,
-        normal: TILE_NORMAL_1,
-        ao: TILE_AO_1,
-        roughness: TILE_ROUGHNESS_1,
+  // Un materiale (tema a rotazione fissa) o un pool di NUM_TILES materiali
+  // (tema a rotazione casuale, uno per orientamento UV — vedi TILE_THEMES)
+  // per ciascun tema, per una data superficie (pavimento/muro/soffitto).
+  // `doubleSided` va passato per muri/soffitto (piani visti da entrambi i
+  // lati, vedi wallMat/ceilingMat più sotto), non per il pavimento (un box,
+  // già visibile correttamente con backFaceCulling di default).
+  function buildSurfaceThemeMats(namePrefix, repeatU, repeatV, doubleSided) {
+    return TILE_THEMES.map((theme, themeIdx) => {
+      if (!theme.randomRotation) {
+        const mat = makeTiledPbrMaterial(`${namePrefix}${themeIdx}`, repeatU, repeatV, theme.files);
+        if (doubleSided) mat.backFaceCulling = false;
+        return mat;
+      }
+      // Più istanze per superficie, ciascuna con la propria rotazione UV
+      // casuale (wAng): altrimenti, essendo tutti i pezzi la stessa immagine
+      // con lo stesso orientamento, il risultato è visivamente troppo
+      // regolare. Ad ogni riciclo se ne pesca una a caso dal pool (update()).
+      return Array.from({ length: NUM_TILES }, (_, i) => {
+        const mat = makeTiledPbrMaterial(`${namePrefix}${themeIdx}_${i}`, repeatU, repeatV, theme.files);
+        if (doubleSided) mat.backFaceCulling = false;
+        const wAng = Math.random() * Math.PI * 2;
+        mat.albedoTexture.wAng = wAng;
+        mat.bumpTexture.wAng = wAng;
+        mat.ambientTexture.wAng = wAng;
+        mat.metallicTexture.wAng = wAng;
+        return mat;
       });
-      if (namePrefix !== "groundMatB") mat.backFaceCulling = false; // muri e soffitto vanno visti da entrambi i lati, come wallMat
-      const wAng = Math.random() * Math.PI * 2;
-      mat.albedoTexture.wAng = wAng;
-      mat.bumpTexture.wAng = wAng;
-      mat.ambientTexture.wAng = wAng;
-      mat.metallicTexture.wAng = wAng;
-      return mat;
     });
   }
-  const groundMatsB = makeThemeBMatPool("groundMatB", NUM_TILES, TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
-  const wallMatsB = makeThemeBMatPool("wallMatB", NUM_TILES, TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
-  const ceilingMatsB = makeThemeBMatPool("ceilingMatB", NUM_TILES, TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor);
+  const groundMatsByTheme = buildSurfaceThemeMats("groundMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor, false);
+  const wallMatsByTheme = buildSurfaceThemeMats("wallMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor, true);
+  const ceilingMatsByTheme = buildSurfaceThemeMats("ceilingMat", TILE_LEN / repeat_factor, WALL_HEIGHT / repeat_factor, true);
+
+  // Ritorna il materiale da assegnare a un pezzo riciclato ora, per il tema
+  // themeIdx: il materiale unico se il tema è a rotazione fissa, uno a caso
+  // dal pool se è a rotazione casuale.
+  function pickSurfaceMat(matsForSurface, themeIdx) {
+    const entry = matsForSurface[themeIdx];
+    return Array.isArray(entry) ? pickRandom(entry) : entry;
+  }
+
+  // Tema per ogni "bucket" di GROUND_THEME_SWITCH_DISTANCE metri: il primo
+  // (0-1000m) è sempre TILE_THEMES[0] (ground_tiles_03), i successivi sono
+  // scelti a caso tra tutti i temi — memorizzati alla prima richiesta così
+  // la scelta resta la stessa per tutta la durata del bucket invece di
+  // ricambiare ad ogni frame (vedi update()).
+  const themeIndexByBucket = new Map([[0, 0]]);
+  function themeForBucket(bucket) {
+    if (!themeIndexByBucket.has(bucket)) {
+      themeIndexByBucket.set(bucket, Math.floor(Math.random() * TILE_THEMES.length));
+    }
+    return themeIndexByBucket.get(bucket);
+  }
 
   function pickRandom(pool) {
     return pool[Math.floor(Math.random() * pool.length)];
@@ -574,7 +649,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       { width: CORRIDOR_HALF_WIDTH * 2, height: 0.5, depth: TILE_LEN },
       scene
     );
-    t.material = groundMatA;
+    t.material = groundMatsByTheme[0];
     t.position.set(0, -0.25, i * TILE_LEN);
     tiles.push(t);
   }
@@ -589,7 +664,7 @@ export async function createGameScene({ engine, canvas, goto }) {
         { width: TILE_LEN, height: WALL_HEIGHT },
         scene
       );
-      w.material = wallMat;
+      w.material = wallMatsByTheme[0];
       // Specchiata in base al lato: altrimenti entrambi i muri avrebbero la
       // stessa normale "vera" (usata per l'illuminazione N·L), e quello con
       // la normale che punta lontano dal centro risulterebbe sempre buio con
@@ -609,7 +684,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       { width: CORRIDOR_HALF_WIDTH * 2, height: TILE_LEN },
       scene
     );
-    c.material = wallMat;
+    c.material = ceilingMatsByTheme[0];
     // Segno opposto rispetto a quello "naturale": con +PI/2 la normale vera
     // punta verso l'alto (lontano dall'interno del corridoio, dove sta la
     // luce), risultando sempre in ombra con point/directional light nonostante
@@ -1500,8 +1575,10 @@ export async function createGameScene({ engine, canvas, goto }) {
     // applicato SOLO ai pezzi che si riciclano in questo stesso frame — i
     // pezzi già visibili, renderizzati con il tema precedente, non vengono
     // ritinti retroattivamente. Il cambio si nota quindi gradualmente, pezzo
-    // per pezzo, man mano che il corridoio scorre e ricicla.
-    const groundTheme = Math.floor(state.distance / GROUND_THEME_SWITCH_DISTANCE) % 2;
+    // per pezzo, man mano che il corridoio scorre e ricicla. Il tema del
+    // bucket corrente è memorizzato (vedi themeForBucket()), non ricalcolato
+    // a caso ad ogni frame.
+    const groundThemeIdx = themeForBucket(Math.floor(state.distance / GROUND_THEME_SWITCH_DISTANCE));
 
     // Movimento laterale (lerp verso la corsia target).
     player.position.x += (state.targetX - player.position.x) * Math.min(1, LANE_LERP * dt);
@@ -1528,21 +1605,21 @@ export async function createGameScene({ engine, canvas, goto }) {
       t.position.z -= move;
       if (t.position.z < -TILE_LEN) {
         t.position.z += TILE_LEN * NUM_TILES;
-        t.material = groundTheme === 0 ? groundMatA : pickRandom(groundMatsB);
+        t.material = pickSurfaceMat(groundMatsByTheme, groundThemeIdx);
       }
     }
     for (const w of walls) {
       w.position.z -= move;
       if (w.position.z < -TILE_LEN) {
         w.position.z += TILE_LEN * NUM_TILES;
-        w.material = groundTheme === 0 ? wallMat : pickRandom(wallMatsB);
+        w.material = pickSurfaceMat(wallMatsByTheme, groundThemeIdx);
       }
     }
     for (const c of ceilings) {
       c.position.z -= move;
       if (c.position.z < -TILE_LEN) {
         c.position.z += TILE_LEN * NUM_TILES;
-        c.material = groundTheme === 0 ? wallMat : pickRandom(ceilingMatsB);
+        c.material = pickSurfaceMat(ceilingMatsByTheme, groundThemeIdx);
       }
     }
     // for (const s of stripes) {

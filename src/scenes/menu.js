@@ -20,6 +20,7 @@ import { CONFIG } from "../config/index.js";
 // del logo verrà applicata in seguito (basta assegnarla a logoMat.diffuseTexture).
 const LOGO_TARGET_Y = 1; // stessa altezza a cui puntava la camera/la vecchia gem
 const LOGO_DROP_SPEED = 3; // unità/s
+const LOGO_SPIN_SPEED = 1; // rad/s, rotazione continua sul proprio asse (vedi update())
 
 // Scena Menu: sfondo 3D leggero (il piano del logo che scende) + overlay HTML per i testi.
 export function createMenuScene({ engine, goto }) {
@@ -50,10 +51,12 @@ export function createMenuScene({ engine, goto }) {
   const logoStartY = screenTopY + logoHeight; // sopra la vista, fuori schermo
 
   const image_logo = loadTexture(scene, "glanis_bday.png")
+  image_logo.hasAlpha = true; // rispetta il canale alpha del PNG invece di renderlo opaco
 
   const logoPlane = MeshBuilder.CreatePlane("logoPlane", { width: logoWidth, height: logoHeight }, scene);
   const logoMat = new StandardMaterial("logoMat", scene);
   logoMat.diffuseTexture = image_logo;
+  logoMat.useAlphaFromDiffuseTexture = true; // trasparenza guidata dall'alpha della texture stessa
   logoMat.emissiveColor = new Color3(0.1, 0.35, 0.55);
   logoMat.specularColor = new Color3(0, 0, 0);
   logoMat.backFaceCulling = false;
@@ -91,6 +94,11 @@ export function createMenuScene({ engine, goto }) {
     if (logoPlane.position.y > logoRestY) {
       logoPlane.position.y = Math.max(logoRestY, logoPlane.position.y - LOGO_DROP_SPEED * dt);
     }
+    // Rotazione continua sul proprio asse: essendo in BILLBOARDMODE_ALL (il
+    // piano resta sempre frontale alla camera), solo l'asse z produce un
+    // effetto di rotazione visibile — x/y verrebbero sovrascritti dal
+    // billboard ad ogni frame.
+    logoPlane.rotation.z += LOGO_SPIN_SPEED * dt;
   }
 
   function dispose() {
