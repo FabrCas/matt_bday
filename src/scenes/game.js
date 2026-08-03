@@ -2012,6 +2012,15 @@ export async function createGameScene({ engine, canvas, goto }) {
       // Due casi: già appoggiato lì (mantiene la quota), oppure un
       // atterraggio fresco dall'alto (in caduta, con la quota che sta
       // attraversando la fascia attorno a topY in questo preciso momento).
+      // La fascia di aggancio è allargata in base allo spostamento verticale
+      // del frame corrente (velY * dt): con la discesa rapida (fastFall, tasto
+      // S) la velocità verticale è molto più alta che in caduta libera, quindi
+      // un frame può spostare il player oltre la finestra fissa di LAND_CATCH
+      // senza mai campionare una posizione al suo interno, facendolo passare
+      // per un urto laterale invece che un atterraggio. Garantendo che la
+      // fascia sia sempre almeno grande quanto il passo verticale del frame,
+      // è impossibile "saltarla" indipendentemente dalla velocità di caduta.
+      const landCatch = Math.max(LAND_CATCH, Math.abs(state.velY) * dt);
       const landingOnTop =
         t.topY != null &&
         alignedX &&
@@ -2019,8 +2028,8 @@ export async function createGameScene({ engine, canvas, goto }) {
         ((state.standObstacle === ob && state.grounded) ||
           (!state.grounded &&
             state.velY <= 0 &&
-            player.position.y <= t.topY + LAND_CATCH &&
-            player.position.y >= t.topY - LAND_CATCH));
+            player.position.y <= t.topY + landCatch &&
+            player.position.y >= t.topY - landCatch));
 
       if (landingOnTop) {
         player.position.y = t.topY + 0.8; // stessa convenzione del pavimento: 0.8 = altezza del player sopra la superficie d'appoggio

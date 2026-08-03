@@ -76,9 +76,16 @@ export async function createWishesScene({ engine }) {
   const light = new HemisphericLight("wishesLight", new Vector3(0.2, 1, 0.3), scene);
   light.intensity = 0.9;
 
+  // Promise (non solo il risultato) tenuta a parte: se il caricamento
+  // dell'audio impiega più tempo di texture/mesh (whenReadyAsync sotto),
+  // `soundwishes` sarebbe ancora null quando si tenta il play e la
+  // riproduzione andrebbe persa silenziosamente (soundwishes?.play() è un
+  // no-op). Aspettando la promise il play parte non appena il suono è pronto,
+  // anche se questo accade dopo la fine del caricamento della scena.
   let soundwishes = null;
-  loadSound("wishes_sound.mp3", { volume: 0.7 , loop: false}).then((s) => {
+  const soundwishesReady = loadSound("wishes_sound.mp3", { volume: 0.7, loop: false }).then((s) => {
     soundwishes = s;
+    return s;
   });
 
   // ---- Piani orbitanti intorno al centro (stesso punto dove è centrato il
@@ -141,7 +148,7 @@ export async function createWishesScene({ engine }) {
 
   ui.show("wishes");
   ui.updateWishes();
-  soundwishes?.play();
+  soundwishesReady.then((s) => s.play());
 
   function update(dt) {
     orbitAngle += dt * GALLERY_ROTATION_SPEED;
@@ -149,6 +156,7 @@ export async function createWishesScene({ engine }) {
   }
 
   function dispose() {
+    disposeSound(soundwishes);
     scene.dispose();
   }
 
