@@ -37,7 +37,7 @@ wishes:
 
 # --- Scena comandi (mostrata tra menu e game, saltata se debug: true) ---
 controls:
-  duration: 10              # secondi di permanenza prima di passare automaticamente al gioco
+  duration: 15              # secondi di permanenza prima di passare automaticamente al gioco
 
 # --- Cartelloni pubblicitari del corridoio ---
 billboards:

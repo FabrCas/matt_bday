@@ -202,6 +202,12 @@ const HIT_INVULN_TIME = 3; // secondi di invulnerabilità dopo un colpo, evita d
 const HIT_INVULN_ALPHA = 0.1; // trasparenza del player nella fase "trasparente" del lampeggio
 const HIT_BLINK_INTERVAL = 0.15; // secondi tra un cambio di trasparenza e l'altro durante l'invulnerabilità
 const STAR_BLINK_INTERVAL = 0.15; // secondi tra un'accensione/spegnimento del bagliore durante la stella (stesso stile del lampeggio da colpo)
+// Tolleranza (unità di mondo) attorno all'altezza topY di un ostacolo entro
+// cui un atterraggio in caduta viene "agganciato" alla faccia superiore
+// (vedi update()): troppo stretta e il salto la salterebbe interamente a
+// framerate bassi/cadute veloci, troppo larga e trasformerebbe in un
+// atterraggio "gratuito" quello che sarebbe stato un salto insufficiente.
+const LAND_CATCH = 0.35;
 const LANES = G.lanes; // posizioni x delle 3 corsie
 const LANE_LERP = G.laneChangeSpeed; // velocità di cambio corsia
 const GRAVITY = G.gravity;
@@ -1232,11 +1238,15 @@ export async function createGameScene({ engine, canvas, goto }) {
   // "weight" pesa la probabilità di scelta in pickObstacleType(): il cubo
   // semplice resta il più comune, le varianti più larghe/alte sono rare, per
   // dare varietà senza rendere il percorso irriconoscibile o troppo punitivo.
+  // "topY" è l'altezza della faccia superiore piatta, per l'atterraggio
+  // senza danno (vedi update()): null per columnV, che è pensata per essere
+  // insormontabile (costringe sempre a cambiare corsia, jumpClearY infatti
+  // è oltre la portata di qualunque salto).
   const OBSTACLE_TYPES = [
-    { id: "cube", weight: 5, poolSize: 8, build: makeCubeObstacleMesh, laneSpan: 1, jumpClearY: 1.6 },
-    { id: "columnV", weight: 1, poolSize: 3, build: makeColumnVMesh, laneSpan: 1, jumpClearY: WALL_HEIGHT },
-    { id: "wall2", weight: 2, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 2), laneSpan: 2, jumpClearY: 1.6 },
-    { id: "wall3", weight: 1, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 3), laneSpan: 3, jumpClearY: 1.6 },
+    { id: "cube", weight: 5, poolSize: 8, build: makeCubeObstacleMesh, laneSpan: 1, jumpClearY: 1.6, topY: OBSTACLE_CUBE_SIZE },
+    { id: "columnV", weight: 1, poolSize: 3, build: makeColumnVMesh, laneSpan: 1, jumpClearY: WALL_HEIGHT, topY: null },
+    { id: "wall2", weight: 2, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 2), laneSpan: 2, jumpClearY: 1.6, topY: OBSTACLE_CUBE_SIZE },
+    { id: "wall3", weight: 1, poolSize: 3, build: (name) => makeHorizontalSpanMesh(name, 3), laneSpan: 3, jumpClearY: 1.6, topY: OBSTACLE_CUBE_SIZE },
   ].map((t) => ({ ...t, collisionHalfWidth: (t.laneSpan * LANE_GAP) / 2 }));
 
   function pickObstacleType() {
@@ -1421,6 +1431,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     velY: 0,
     grounded: true,
     jumpsUsed: 0, // salti già effettuati da quando si è lasciato il suolo (vedi jump()/MAX_JUMPS)
+    standObstacle: null, // ostacolo su cui il player è "appoggiato" (atterrato sulla faccia superiore), vedi update()
     nextSpawnZ: SPAWN_AHEAD,
     fogTime: 0, // orologio indipendente dalla velocità, per il moto dei banchi di nebbia
     quietRowsRemaining: 0, // >0: righe senza spawn ancora da consumare, vedi spawnRow()
@@ -1602,6 +1613,7 @@ export async function createGameScene({ engine, canvas, goto }) {
     if (state.jumpsUsed < MAX_JUMPS) {
       state.velY = JUMP_SPEED;
       state.grounded = false;
+      state.standObstacle = null; // stacco esplicito da un eventuale ostacolo su cui si era appoggiati
       state.jumpsUsed += 1;
       if (jumpSfx.length) {
         jumpSfx[Math.floor(Math.random() * jumpSfx.length)]?.play();
@@ -1748,6 +1760,29 @@ export async function createGameScene({ engine, canvas, goto }) {
     console.log(gameover_message);
     goto("gameover", { coins: state.coins, distance: state.distance, amount: CONFIG.economy.maxPayout, message: gameover_message});
   }
+
+  // Precompila gli shader di TUTTI i materiali usati in scena, comprese le
+  // mesh create disattivate (setEnabled(false)): i pool di ostacoli, monete,
+  // power-up e il velo di nebbia. scene.whenReadyAsync() qui sotto salta le
+  // mesh non abilitate, quindi senza questo passaggio i loro shader
+  // venivano compilati SOLO alla prima vera comparsa in gioco (il primo
+  // ostacolo/moneta spawnato) — è quel compile-on-demand a causare il calo
+  // di frame osservato nelle primissime fasi, subito dopo il caricamento,
+  // proprio quando iniziano a comparire i primi oggetti di gioco.
+  // forceCompilationAsync non richiede che la mesh sia abilitata/visibile,
+  // solo che esista già con la sua geometria (vero a questo punto per
+  // tutte). Deduplica per materiale (non per mesh): molte mesh condividono
+  // lo stesso materiale (es. tutte le monete), compilarlo una sola volta
+  // basta e evita centinaia di chiamate ridondanti.
+  const materialsToPrecompile = new Map();
+  for (const m of scene.meshes) {
+    if (m.material && !materialsToPrecompile.has(m.material)) {
+      materialsToPrecompile.set(m.material, m);
+    }
+  }
+  await Promise.all(
+    Array.from(materialsToPrecompile, ([mat, mesh]) => mat.forceCompilationAsync(mesh))
+  );
 
   // Aspetta che tutte le texture/materiali (pavimento, muri, cartelloni,
   // lampadari, nebbia, ecc.) siano effettivamente pronti prima di far
@@ -1954,22 +1989,63 @@ export async function createGameScene({ engine, canvas, goto }) {
       ob.mesh.position.z -= move;
       // Dissolvenza in ingresso: appare gradualmente invece di comparire di scatto.
       ob.mesh.visibility = Math.min(1, Math.max(0, (SPAWN_AHEAD - ob.mesh.position.z) / FADE_DISTANCE));
-      // Collisione: vicino in z, dentro la larghezza reale del blocco
+      // Allineamento: vicino in z, dentro la larghezza reale del blocco
       // (collisionHalfWidth, calcolata da laneSpan — combacia sempre con la
-      // geometria visibile, vedi OBSTACLE_TYPES), player non abbastanza in
-      // alto da superarla saltando (soglia specifica del tipo di ostacolo).
+      // geometria visibile, vedi OBSTACLE_TYPES).
       const t = ob.obstacleType;
-      if (
+      const alignedZ = Math.abs(ob.mesh.position.z) < 0.9;
+      const alignedX = Math.abs(ob.mesh.position.x - px) < t.collisionHalfWidth;
+
+      // Se il player era appoggiato su QUESTO ostacolo ma non è più
+      // allineato (l'ostacolo è scorso via da sotto, o ha cambiato corsia),
+      // si stacca: la normale gravità (già integrata sopra) lo farà
+      // ricadere sul pavimento nei prossimi frame.
+      if (state.standObstacle === ob && !(alignedX && alignedZ)) {
+        state.standObstacle = null;
+        state.grounded = false;
+      }
+
+      // Atterraggio sulla faccia superiore (solo per i tipi con topY, vedi
+      // OBSTACLE_TYPES — columnV non è "atterrabile"): nessun danno, il
+      // player resta appoggiato finché l'ostacolo non gli scorre via da
+      // sotto (gestito qui sopra), poi ricade normalmente sul pavimento.
+      // Due casi: già appoggiato lì (mantiene la quota), oppure un
+      // atterraggio fresco dall'alto (in caduta, con la quota che sta
+      // attraversando la fascia attorno a topY in questo preciso momento).
+      const landingOnTop =
+        t.topY != null &&
+        alignedX &&
+        alignedZ &&
+        ((state.standObstacle === ob && state.grounded) ||
+          (!state.grounded &&
+            state.velY <= 0 &&
+            player.position.y <= t.topY + LAND_CATCH &&
+            player.position.y >= t.topY - LAND_CATCH));
+
+      if (landingOnTop) {
+        player.position.y = t.topY + 0.8; // stessa convenzione del pavimento: 0.8 = altezza del player sopra la superficie d'appoggio
+        state.velY = 0;
+        state.grounded = true;
+        state.jumpsUsed = 0;
+        state.standObstacle = ob;
+      } else if (
+        // Colpito su un'altra faccia (frontale/laterale, nella direzione
+        // della corsa): stesso controllo di prima, py sotto la soglia di
+        // salto del tipo specifico di ostacolo.
         state.invulnerableTimer <= 0 &&
         state.starTimer <= 0 &&
-        Math.abs(ob.mesh.position.z) < 0.9 &&
-        Math.abs(ob.mesh.position.x - px) < t.collisionHalfWidth &&
+        alignedZ &&
+        alignedX &&
         py < t.jumpClearY
       ) {
         hitObstacle(ob);
         if (!state.running) return;
       }
       if (ob.mesh.position.z < DESPAWN_BEHIND) {
+        if (state.standObstacle === ob) {
+          state.standObstacle = null;
+          state.grounded = false;
+        }
         ob.active = false;
         ob.mesh.setEnabled(false);
       }
