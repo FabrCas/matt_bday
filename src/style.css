@@ -180,19 +180,20 @@ html, body {
   display: flex;
   flex-wrap: nowrap; /* mai su due righe: vedi .hud-item per il motivo del wrap che risolveva */
   justify-content: center;
-  gap: clamp(0.4rem, 2.5vw, 1.5rem); /* si stringe su schermi stretti invece di forzare l'a capo */
-  padding-inline: 0.4rem;
+  gap: clamp(0.2rem, 1.5vw, 1.5rem); /* si stringe su schermi stretti invece di forzare l'a capo */
+  padding-inline: 0.3rem;
   z-index: 5;
   pointer-events: none;
 }
 
 .hud-item {
-  /* clamp più basso di prima: su telefoni stretti, con gap/padding ridotti
-     qui sotto, evita che 3 pill affiancate debbano già rimpicciolirsi al
-     valore minimo per un valore breve. */
-  font-size: clamp(0.85rem, 4vw, 1.5rem);
+  /* clamp abbastanza basso da stare in una riga anche col numero massimo di
+     pill visibili insieme (vite, monete, distanza, stella, 2x): con 5 pill
+     affiancate su un telefono stretto il minimo deve poter scendere parecchio,
+     altrimenti il testo trabocca invece di andare semplicemente più piccolo. */
+  font-size: clamp(0.62rem, 3vw, 1.5rem);
   font-weight: 700;
-  padding: clamp(0.25rem, 1.2vw, 0.35rem) clamp(0.5rem, 2.5vw, 0.9rem);
+  padding: clamp(0.15rem, 0.9vw, 0.35rem) clamp(0.3rem, 1.6vw, 0.9rem);
   background: rgba(15, 23, 42, 0.55);
   border-radius: 999px;
   backdrop-filter: blur(4px);

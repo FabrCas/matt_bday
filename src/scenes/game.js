@@ -1433,23 +1433,30 @@ export async function createGameScene({ engine, canvas, goto }) {
     return makePowerupCommon(model, "star");
   }
   function makeHeart(i) {
-    // Cuore approssimato con due lobi sferici affiancati e un cuneo (box
-    // ruotato 45°) che ne riempie l'incavo inferiore — stessa tecnica del
-    // martello (primitive combinate sotto un root Mesh).
+    // Cuore approssimato con due lobi sferici affiancati in alto e una
+    // punta conica (base larga in alto, apice in basso: diameterBottom: 0)
+    // che ne prosegue la sagoma verso il basso — stessa tecnica del martello
+    // (primitive combinate sotto un root Mesh). Un box ruotato 45° darebbe
+    // una punta a diamante, spigolosa e simmetrica anche in alto: il cono dà
+    // invece un'unica punta che si assottiglia solo verso il basso, come un
+    // vero cuore.
     const root = new Mesh("heart" + i, scene);
-    const lobeL = MeshBuilder.CreateSphere("heart" + i + "_lobeL", { diameter: 0.5, segments: 10 }, scene);
+    const lobeL = MeshBuilder.CreateSphere("heart" + i + "_lobeL", { diameter: 0.5, segments: 12 }, scene);
     lobeL.material = heartMat;
     lobeL.parent = root;
     lobeL.position.set(-0.18, 0.15, 0);
-    const lobeR = MeshBuilder.CreateSphere("heart" + i + "_lobeR", { diameter: 0.5, segments: 10 }, scene);
+    const lobeR = MeshBuilder.CreateSphere("heart" + i + "_lobeR", { diameter: 0.5, segments: 12 }, scene);
     lobeR.material = heartMat;
     lobeR.parent = root;
     lobeR.position.set(0.18, 0.15, 0);
-    const wedge = MeshBuilder.CreateBox("heart" + i + "_wedge", { size: 0.42 }, scene);
-    wedge.material = heartMat;
-    wedge.parent = root;
-    wedge.rotation.z = Math.PI / 4;
-    wedge.position.set(0, -0.15, 0);
+    const tip = MeshBuilder.CreateCylinder(
+      "heart" + i + "_tip",
+      { diameterTop: 0.7, diameterBottom: 0, height: 0.55, tessellation: 24 },
+      scene
+    );
+    tip.material = heartMat;
+    tip.parent = root;
+    tip.position.set(0, -0.15, 0);
     return makePowerupCommon(root, "extraLife");
   }
   function makeDoubleCoins(i) {
