@@ -206,6 +206,14 @@ html, body {
   flex: 0 0 auto;
 }
 
+/* Vite/monete/distanza: le info sempre presenti, leggermente più grandi
+   delle pill secondarie (stella/2x, mostrate solo a tratti) per restare ben
+   leggibili anche a distanza/su schermi piccoli. */
+.hud-item-main {
+  font-size: clamp(0.75rem, 3.6vw, 1.7rem);
+  padding: clamp(0.2rem, 1.1vw, 0.4rem) clamp(0.4rem, 1.9vw, 1rem);
+}
+
 /* Flash rosso al momento di un colpo (vedi ui.flashHit()): appare di scatto
    (transizione quasi nulla in entrata) e sfuma via in ~0.4s quando la classe
    "active" viene rimossa, per dare l'idea dell'impatto senza restare troppo
