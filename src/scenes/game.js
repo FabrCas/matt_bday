@@ -601,19 +601,26 @@ export async function createGameScene({ engine, canvas, goto }) {
   // hammerMat.maxSimultaneousLights = MAX_LIGHTS;
   hammerMat.disableLighting = true;
 
-  // Power-up (vita extra): stesso schema del martello, forma procedurale.
+  // Power-up (vita extra "❤" e moneta doppia "2X"): stesso schema, un glifo
+  // disegnato a runtime su una DynamicTexture (nessun asset immagine
+  // dedicato) applicato a due piani incrociati a 90° (vedi makeHeart()/
+  // makeDoubleCoins() — stessa tecnica degli sprite di nebbia in
+  // FOG_TEXTURES: dà una sagoma leggibile da ogni angolo mentre il gruppo
+  // ruota, invece di un piano piatto che si "assottiglia" di profilo). La
+  // precedente versione del cuore (lobi sferici + cono) restava poco
+  // riconoscibile come cuore a questa scala: un glifo pieno lo è a colpo
+  // d'occhio, come il testo "2X".
+  const heartTexture = new DynamicTexture("heartTex", { width: 256, height: 256 }, scene, true);
+  heartTexture.hasAlpha = true;
+  heartTexture.drawText("❤", null, null, "bold 190px sans-serif", "#ff2d55", "transparent", true, true);
   const heartMat = new StandardMaterial("heartMat", scene);
-  heartMat.emissiveColor = new Color3(0.9, 0.08, 0.22);
-  heartMat.diffuseColor = new Color3(0.15, 0.02, 0.05);
+  heartMat.diffuseTexture = heartTexture;
+  heartMat.useAlphaFromDiffuseTexture = true;
+  heartMat.emissiveColor = new Color3(0.9, 0.15, 0.3);
   heartMat.specularColor = new Color3(0, 0, 0);
   heartMat.disableLighting = true;
+  heartMat.backFaceCulling = false;
 
-  // Power-up (moneta doppia "2X"): testo disegnato a runtime su una
-  // DynamicTexture (nessun asset immagine dedicato), applicato a due piani
-  // incrociati a 90° (vedi makeDoubleCoins() — stessa tecnica degli sprite
-  // di nebbia in FOG_TEXTURES: dà una sagoma leggibile da ogni angolo mentre
-  // il gruppo ruota, invece di un piano piatto che si "assottiglia" di
-  // profilo).
   const doubleCoinsTexture = new DynamicTexture("doubleCoinsTex", { width: 256, height: 256 }, scene, true);
   doubleCoinsTexture.hasAlpha = true;
   doubleCoinsTexture.drawText("2X", null, null, "bold 150px sans-serif", "#ffe600", "transparent", true, true);
@@ -1433,30 +1440,16 @@ export async function createGameScene({ engine, canvas, goto }) {
     return makePowerupCommon(model, "star");
   }
   function makeHeart(i) {
-    // Cuore approssimato con due lobi sferici affiancati in alto e una
-    // punta conica (base larga in alto, apice in basso: diameterBottom: 0)
-    // che ne prosegue la sagoma verso il basso — stessa tecnica del martello
-    // (primitive combinate sotto un root Mesh). Un box ruotato 45° darebbe
-    // una punta a diamante, spigolosa e simmetrica anche in alto: il cono dà
-    // invece un'unica punta che si assottiglia solo verso il basso, come un
-    // vero cuore.
+    // Due piani "❤" incrociati a 90° (stessa tecnica di makeDoubleCoins(),
+    // vedi heartMat più sopra).
     const root = new Mesh("heart" + i, scene);
-    const lobeL = MeshBuilder.CreateSphere("heart" + i + "_lobeL", { diameter: 0.5, segments: 12 }, scene);
-    lobeL.material = heartMat;
-    lobeL.parent = root;
-    lobeL.position.set(-0.18, 0.15, 0);
-    const lobeR = MeshBuilder.CreateSphere("heart" + i + "_lobeR", { diameter: 0.5, segments: 12 }, scene);
-    lobeR.material = heartMat;
-    lobeR.parent = root;
-    lobeR.position.set(0.18, 0.15, 0);
-    const tip = MeshBuilder.CreateCylinder(
-      "heart" + i + "_tip",
-      { diameterTop: 0.7, diameterBottom: 0, height: 0.55, tessellation: 24 },
-      scene
-    );
-    tip.material = heartMat;
-    tip.parent = root;
-    tip.position.set(0, -0.15, 0);
+    const planeA = MeshBuilder.CreatePlane("heart" + i + "_a", { size: 0.9 }, scene);
+    planeA.material = heartMat;
+    planeA.parent = root;
+    const planeB = MeshBuilder.CreatePlane("heart" + i + "_b", { size: 0.9 }, scene);
+    planeB.material = heartMat;
+    planeB.parent = root;
+    planeB.rotation.y = Math.PI / 2;
     return makePowerupCommon(root, "extraLife");
   }
   function makeDoubleCoins(i) {
