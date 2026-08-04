@@ -16,8 +16,10 @@ game:
   # Se false, nella schermata di game over non compare il bottone "rigioca"
   # (es. per disattivare i replay dopo l'evento).
   allowReplay: true
-  # Numero di vite: ogni ostacolo colpito ne toglie una; a 0 si va a game over.
+  # Numero di vite iniziali: ogni ostacolo colpito ne toglie una; a 0 si va a game over.
   lives: 3
+  # Tetto oltre il quale il power-up vita extra (cuore) non ha più effetto.
+  maxLives: 5
   # Testo mostrato nella schermata di auguri (raggiungibile dal bottone "continua").
   wishesMessage: "Vittoria sbloccata!\nHai superato la prova, ora puoi accedere al Boss Finale:\nscegliere come spendere la tua ricompensa.\nBuon compleanno, dottore!"
 
@@ -66,16 +68,21 @@ billboards:
 # rossa): con tutte le probabilità di default può quindi capitare più di un
 # power-up nella stessa riga (su corsie diverse).
 powerups:
-  magnet:               # 🧲 attrae verso il giocatore tutte le monete attive in pista (poi raccolte al contatto)
+  magnet:               # attrae verso il giocatore tutte le monete attive in pista (poi raccolte al contatto)
     spawnChance: 0.01   # probabilità (0..1) per riga
     duration: 10        # secondi in cui le monete vengono attratte verso il giocatore
     attractSpeed: 18    # velocità (unità/s) con cui le monete si muovono verso il giocatore mentre sono attratte
-  hammer:                # 🔨 distrugge subito tutti gli ostacoli attivi in pista
+  hammer:                # distrugge subito tutti gli ostacoli attivi in pista
     spawnChance: 0.01    # probabilità (0..1) per riga
     noObstacleDuration: 4 # secondi dopo l'uso in cui non vengono generati nuovi ostacoli
-  star:                  # ⭐ invincibilità: ignora le collisioni con gli ostacoli
+  star:                  # invincibilità: ignora le collisioni con gli ostacoli
     spawnChance: 0.01    # probabilità (0..1) per riga
     duration: 10         # secondi di invincibilità
+  extraLife:             # aggiunge una vita (fino al tetto game.maxLives)
+    spawnChance: 0.005    # probabilità (0..1) per riga
+  doubleCoins:           # raddoppia il valore delle monete raccolte, cumulativo in tempo e moltiplicatore
+    spawnChance: 0.01    # probabilità (0..1) per riga
+    duration: 20          # secondi per cui il moltiplicatore resta attivo
 
 # --- Economia / vincita ---
 economy:

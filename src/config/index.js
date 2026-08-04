@@ -11,7 +11,8 @@ const defaults = {
     subtitle: "",
     allowReplay: true,
     wishesMessage: "",
-    lives: 3, // ogni ostacolo colpito ne toglie una; a 0 si va a game over
+    lives: 3, // vite iniziali; ogni ostacolo colpito ne toglie una, a 0 si va a game over
+    maxLives: 5, // tetto oltre il quale il power-up vita extra non ha più effetto
   },
   economy: {
     currencySymbol: "€",
@@ -45,6 +46,13 @@ const defaults = {
     star: {
       spawnChance: 0.02, // probabilità (0..1) per riga
       duration: 30,      // secondi di invincibilità
+    },
+    extraLife: {
+      spawnChance: 0.01, // probabilità (0..1) per riga
+    },
+    doubleCoins: {
+      spawnChance: 0.02, // probabilità (0..1) per riga
+      duration: 20,      // secondi in cui le monete raccolte valgono doubleCoinsMultiplier volte tanto
     },
   },
   gameplay: {

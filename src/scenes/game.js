@@ -9,6 +9,7 @@ import {
   StandardMaterial,
   PBRMaterial,
   Texture,
+  DynamicTexture,
   Color3,
   Color4,
   Vector3,
@@ -197,7 +198,8 @@ const BLOCK_THEMES = [
 
 // ===== Costanti di gioco (da config statica) =====
 const G = CONFIG.gameplay;
-const MAX_LIVES = CONFIG.game.lives; // vite iniziali: un ostacolo colpito ne toglie una
+const STARTING_LIVES = CONFIG.game.lives; // vite con cui si inizia la partita
+const MAX_LIVES = CONFIG.game.maxLives; // tetto oltre il quale il power-up vita extra non ha più effetto
 const HIT_INVULN_TIME = 3; // secondi di invulnerabilità dopo un colpo, evita di perdere più vite sullo stesso ostacolo
 const HIT_INVULN_ALPHA = 0.1; // trasparenza del player nella fase "trasparente" del lampeggio
 const HIT_BLINK_INTERVAL = 0.15; // secondi tra un cambio di trasparenza e l'altro durante l'invulnerabilità
@@ -246,11 +248,14 @@ const POWERUP_TYPES = [
   { kind: "magnet", spawnChance: CONFIG.powerups.magnet.spawnChance, yOffset: 0 },
   { kind: "hammer", spawnChance: CONFIG.powerups.hammer.spawnChance, yOffset: 0 },
   { kind: "star", spawnChance: CONFIG.powerups.star.spawnChance, yOffset: 0 },
+  { kind: "extraLife", spawnChance: CONFIG.powerups.extraLife.spawnChance, yOffset: 0 },
+  { kind: "doubleCoins", spawnChance: CONFIG.powerups.doubleCoins.spawnChance, yOffset: 0 },
 ];
 const HAMMER_NO_OBSTACLE_DURATION = CONFIG.powerups.hammer.noObstacleDuration;
 const STAR_DURATION = CONFIG.powerups.star.duration;
 const MAGNET_DURATION = CONFIG.powerups.magnet.duration;
 const MAGNET_ATTRACT_SPEED = CONFIG.powerups.magnet.attractSpeed;
+const DOUBLE_COINS_DURATION = CONFIG.powerups.doubleCoins.duration;
 // ---- Lampadari del corridoio (box giallo + point light poco sotto) ----
 // Placeholder: in seguito il box verrà sostituito da un modello importato.
 // Riciclati come muri/tile/soffitto, ognuno porta con sé la propria luce
@@ -595,6 +600,30 @@ export async function createGameScene({ engine, canvas, goto }) {
   hammerMat.specularColor = new Color3(0, 0, 0);
   // hammerMat.maxSimultaneousLights = MAX_LIGHTS;
   hammerMat.disableLighting = true;
+
+  // Power-up (vita extra): stesso schema del martello, forma procedurale.
+  const heartMat = new StandardMaterial("heartMat", scene);
+  heartMat.emissiveColor = new Color3(0.9, 0.08, 0.22);
+  heartMat.diffuseColor = new Color3(0.15, 0.02, 0.05);
+  heartMat.specularColor = new Color3(0, 0, 0);
+  heartMat.disableLighting = true;
+
+  // Power-up (moneta doppia "2X"): testo disegnato a runtime su una
+  // DynamicTexture (nessun asset immagine dedicato), applicato a due piani
+  // incrociati a 90° (vedi makeDoubleCoins() — stessa tecnica degli sprite
+  // di nebbia in FOG_TEXTURES: dà una sagoma leggibile da ogni angolo mentre
+  // il gruppo ruota, invece di un piano piatto che si "assottiglia" di
+  // profilo).
+  const doubleCoinsTexture = new DynamicTexture("doubleCoinsTex", { width: 256, height: 256 }, scene, true);
+  doubleCoinsTexture.hasAlpha = true;
+  doubleCoinsTexture.drawText("2X", null, null, "bold 150px sans-serif", "#ffe600", "transparent", true, true);
+  const doubleCoinsMat = new StandardMaterial("doubleCoinsMat", scene);
+  doubleCoinsMat.diffuseTexture = doubleCoinsTexture;
+  doubleCoinsMat.useAlphaFromDiffuseTexture = true;
+  doubleCoinsMat.emissiveColor = new Color3(0.9, 0.8, 0.05);
+  doubleCoinsMat.specularColor = new Color3(0, 0, 0);
+  doubleCoinsMat.disableLighting = true;
+  doubleCoinsMat.backFaceCulling = false;
 
   // ---- Suoni ----
   // Non in `await`: un SFX non è critico per il gioco, quindi il suo
@@ -1403,11 +1432,45 @@ export async function createGameScene({ engine, canvas, goto }) {
     fixImportedMaterials(model.getChildMeshes());
     return makePowerupCommon(model, "star");
   }
+  function makeHeart(i) {
+    // Cuore approssimato con due lobi sferici affiancati e un cuneo (box
+    // ruotato 45°) che ne riempie l'incavo inferiore — stessa tecnica del
+    // martello (primitive combinate sotto un root Mesh).
+    const root = new Mesh("heart" + i, scene);
+    const lobeL = MeshBuilder.CreateSphere("heart" + i + "_lobeL", { diameter: 0.5, segments: 10 }, scene);
+    lobeL.material = heartMat;
+    lobeL.parent = root;
+    lobeL.position.set(-0.18, 0.15, 0);
+    const lobeR = MeshBuilder.CreateSphere("heart" + i + "_lobeR", { diameter: 0.5, segments: 10 }, scene);
+    lobeR.material = heartMat;
+    lobeR.parent = root;
+    lobeR.position.set(0.18, 0.15, 0);
+    const wedge = MeshBuilder.CreateBox("heart" + i + "_wedge", { size: 0.42 }, scene);
+    wedge.material = heartMat;
+    wedge.parent = root;
+    wedge.rotation.z = Math.PI / 4;
+    wedge.position.set(0, -0.15, 0);
+    return makePowerupCommon(root, "extraLife");
+  }
+  function makeDoubleCoins(i) {
+    // Due piani "2X" incrociati a 90° (vedi doubleCoinsMat più sopra).
+    const root = new Mesh("doubleCoins" + i, scene);
+    const planeA = MeshBuilder.CreatePlane("doubleCoins" + i + "_a", { size: 0.9 }, scene);
+    planeA.material = doubleCoinsMat;
+    planeA.parent = root;
+    const planeB = MeshBuilder.CreatePlane("doubleCoins" + i + "_b", { size: 0.9 }, scene);
+    planeB.material = doubleCoinsMat;
+    planeB.parent = root;
+    planeB.rotation.y = Math.PI / 2;
+    return makePowerupCommon(root, "doubleCoins");
+  }
 
   const powerupsByKind = {
     magnet: Array.from({ length: 2 }, (_, i) => makeMagnet(i)),
     hammer: Array.from({ length: 2 }, (_, i) => makeHammer(i)),
     star: Array.from({ length: 2 }, (_, i) => makeStar(i)),
+    extraLife: Array.from({ length: 2 }, (_, i) => makeHeart(i)),
+    doubleCoins: Array.from({ length: 2 }, (_, i) => makeDoubleCoins(i)),
   };
   const powerups = Object.values(powerupsByKind).flat(); // scorrimento/riciclo unico in update()
 
@@ -1421,11 +1484,13 @@ export async function createGameScene({ engine, canvas, goto }) {
     speed: START_SPEED,
     distance: 0,
     coins: 0,
-    lives: MAX_LIVES,
+    lives: STARTING_LIVES,
     invulnerableTimer: 0, // >0 dopo un colpo: ignora altre collisioni per HIT_INVULN_TIME secondi
     starTimer: 0, // >0 dopo la stella: ignora le collisioni con gli ostacoli per STAR_DURATION secondi
     hammerNoObstacleTimer: 0, // >0 dopo il martello: nessun nuovo ostacolo per HAMMER_NO_OBSTACLE_DURATION secondi
     magnetTimer: 0, // >0 dopo il magnete: le monete attive vengono attratte verso il giocatore per MAGNET_DURATION secondi
+    doubleCoinsTimer: 0, // >0 dopo il 2x: le monete raccolte valgono doubleCoinsMultiplier volte tanto
+    doubleCoinsMultiplier: 1, // raddoppia (x2, x4, x8...) ad ogni 2x raccolto mentre uno precedente è ancora attivo
     laneIndex: 1,
     targetX: LANES[1],
     velY: 0,
@@ -1445,7 +1510,7 @@ export async function createGameScene({ engine, canvas, goto }) {
   // molti frame consecutivi. Scrivere nel DOM (textContent, ricostruzione
   // della stringa cuori) solo quando cambia davvero evita un costo per-frame
   // sprecato che contribuiva ai cali di frame.
-  const lastHud = { coins: null, distance: null, lives: null, starTime: null };
+  const lastHud = { coins: null, distance: null, lives: null, starTime: null, doubleTime: null };
 
   function spawnRow() {
     // Pause brevi e periodiche senza alcuno spawn: danno respiro al ritmo di
@@ -1745,6 +1810,19 @@ export async function createGameScene({ engine, canvas, goto }) {
       soundpowerupstart?.stop();
       soundpowerupstart?.play();
       setPlayerGlow(true);
+    } else if (kind === "extraLife") {
+      // Non supera il tetto MAX_LIVES (vedi CONFIG.game.maxLives).
+      state.lives = Math.min(MAX_LIVES, state.lives + 1);
+      powerupSfx?.play();
+    } else if (kind === "doubleCoins") {
+      // Cumulativo sia nel tempo (si somma alla durata residua invece di
+      // sovrascriverla) sia nel moltiplicatore (raccoglierne un secondo
+      // mentre uno precedente è ancora attivo lo raddoppia ulteriormente:
+      // x2, poi x4, x8...). Se non ce n'era uno attivo, riparte da x2.
+      if (state.doubleCoinsTimer <= 0) state.doubleCoinsMultiplier = 1;
+      state.doubleCoinsMultiplier *= 2;
+      state.doubleCoinsTimer += DOUBLE_COINS_DURATION;
+      powerupSfx?.play();
     }
   }
 
@@ -1978,6 +2056,13 @@ export async function createGameScene({ engine, canvas, goto }) {
     if (state.magnetTimer > 0) {
       state.magnetTimer = Math.max(0, state.magnetTimer - dt);
     }
+    // Moltiplicatore 2x (vedi activatePowerup()): resettato a x1 solo
+    // quando il timer si esaurisce, non ad ogni frame, così resta valido
+    // per l'intera durata invece di applicarsi a un solo frame.
+    if (state.doubleCoinsTimer > 0) {
+      state.doubleCoinsTimer = Math.max(0, state.doubleCoinsTimer - dt);
+      if (state.doubleCoinsTimer <= 0) state.doubleCoinsMultiplier = 1;
+    }
 
     // Ostacoli e monete: scorrono verso il player.
     const px = player.position.x;
@@ -2087,7 +2172,7 @@ export async function createGameScene({ engine, canvas, goto }) {
       if (Math.abs(co.mesh.position.z) < 0.9 && Math.abs(co.mesh.position.x - px) < 0.9 && Math.abs(py - 1.0) < 1.1) {
         co.active = false;
         co.mesh.setEnabled(false);
-        state.coins += co.value;
+        state.coins += co.value * (state.doubleCoinsTimer > 0 ? state.doubleCoinsMultiplier : 1);
         // if (co.value == G.redCoinValueMultiplier) {
         //   coinredSfx?.play();
         // }
@@ -2124,22 +2209,27 @@ export async function createGameScene({ engine, canvas, goto }) {
     const hudCoins = state.coins * CONFIG.economy.coinValue;
     const hudDistance = Math.floor(state.distance);
     const hudStarTime = Math.ceil(state.starTimer); // conto alla rovescia intero, es. 30,29,...,1,0
+    const hudDoubleTime = Math.ceil(state.doubleCoinsTimer);
     if (
       hudCoins !== lastHud.coins ||
       hudDistance !== lastHud.distance ||
       state.lives !== lastHud.lives ||
-      hudStarTime !== lastHud.starTime
+      hudStarTime !== lastHud.starTime ||
+      hudDoubleTime !== lastHud.doubleTime
     ) {
       lastHud.coins = hudCoins;
       lastHud.distance = hudDistance;
       lastHud.lives = state.lives;
       lastHud.starTime = hudStarTime;
+      lastHud.doubleTime = hudDoubleTime;
       ui.updateHud({
         coins: hudCoins,
         distance: hudDistance,
         lives: state.lives,
         maxLives: MAX_LIVES,
         starTime: hudStarTime,
+        doubleCoinsTime: hudDoubleTime,
+        doubleCoinsMultiplier: state.doubleCoinsMultiplier,
       });
     }
   }

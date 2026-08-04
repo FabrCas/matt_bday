@@ -17,6 +17,9 @@ const els = {
   hudLives: document.getElementById("hud-lives"),
   hudStar: document.getElementById("hud-star"),
   hudStarTime: document.getElementById("hud-star-time"),
+  hudDouble: document.getElementById("hud-double"),
+  hudDoubleTime: document.getElementById("hud-double-time"),
+  hudDoubleMultiplier: document.getElementById("hud-double-multiplier"),
   wonAmount: document.getElementById("won-amount"),
   endMessage: document.getElementById("endgame-message"),
   goCoins: document.getElementById("go-coins"),
@@ -47,7 +50,7 @@ export function show(...names) {
   }
 }
 
-export function updateHud({ coins, distance, lives, maxLives, starTime }) {
+export function updateHud({ coins, distance, lives, maxLives, starTime, doubleCoinsTime, doubleCoinsMultiplier }) {
   els.hudCoins.textContent = coins + " €";
   els.hudDistance.textContent = Math.floor(distance);
   if (lives !== undefined && maxLives !== undefined) {
@@ -58,6 +61,14 @@ export function updateHud({ coins, distance, lives, maxLives, starTime }) {
   const starActive = !!starTime && starTime > 0;
   els.hudStar.classList.toggle("hidden", !starActive);
   if (starActive) els.hudStarTime.textContent = starTime;
+  // Indicatore moneta doppia (power-up 2x, vedi game.js): stesso schema
+  // della stella, con in più il moltiplicatore corrente (x2, x4, x8...).
+  const doubleActive = !!doubleCoinsTime && doubleCoinsTime > 0;
+  els.hudDouble.classList.toggle("hidden", !doubleActive);
+  if (doubleActive) {
+    els.hudDoubleTime.textContent = doubleCoinsTime;
+    els.hudDoubleMultiplier.textContent = "x" + doubleCoinsMultiplier;
+  }
 }
 
 export function updateGameOver({ coins, distance, amount, message}) {
